@@ -1,0 +1,1 @@
+(* semantics of checkol that takes protocol as parameter *)

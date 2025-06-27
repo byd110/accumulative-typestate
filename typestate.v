@@ -1,0 +1,1 @@
+(* typestate system that takes protocol as parameter *)

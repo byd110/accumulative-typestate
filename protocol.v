@@ -216,36 +216,31 @@ Section PumpingWord.
     - move/eqP=> <-. by rewrite addn0.
     - move/hasP=> [u' Hu' Hrec].
       have Hpump : pumping u u' := pump_succs_sound _ _ Hu'.
-      have Hsize : size u' = size u + 1 := pumping_size Hpump.
+      have Hsize : size u' = size u + 1 := pumping_size u u' Hpump.
       have Hsize' : size v = size u' + m := IH _ _ Hrec.
-      rewrite Hsize' Hsize addnA add1n.
-      by [].
-  Qed.
-
-  Lemma pumping_closure_singleton_eq (w0 w : word) :
-    (pumping_closure (pred1 w0) w) <-> (pumping_closure_singleton_dlang w0 w).
-  Proof.
-    split.
-    - move=> Hc.
-      have [m Hreach] := pumping_closure_to_reachable w0 w Hc.
-      have Hsize : size w = size w0 + m := reachable_size m w0 w Hreach.
-      have Hge : size w0 <= size w := by rewrite Hsize; exact: leq_addr.
-      rewrite /pumping_closure_singleton_dlang.
-      rewrite (ltnNge Hge).
-      rewrite Hsize addnK.
-      exact: Hreach.
-    - move=> H.
-      rewrite /pumping_closure_singleton_dlang in H.
-      case: ifP H=> Hlt H; first by [].
-      exact: (reachable_to_pumping_closure w0 _ _ H).
+      by rewrite Hsize' Hsize -addnA add1n.
   Qed.
 
   (* Equivalence: pumping_closure of singleton equals the decidable predicate pumping_closure_singleton_dlang *)
   Lemma pumping_closure_singleton_eq (w0 w : word) :
     (pumping_closure (pred1 w0) w) <-> (pumping_closure_singleton_dlang w0 w).
-  Proof.
+Proof.
+    split.
+    - move=> Hc.
+      have [m Hreach] := pumping_closure_to_reachable w0 w Hc.
+      have Hsize : size w = size w0 + m := reachable_size m w0 w Hreach.
+      have Hge : size w0 <= size w by rewrite Hsize; exact: leq_addr.
+      rewrite /pumping_closure_singleton_dlang.
+      have hlt : size w < size w0 -> false. 
+      { move=> Hlt. rewrite ltnNge in Hlt. by move/negP: Hlt => Hlt. }
+      case: ifP => Hlt. by apply: hlt. have Hsize': size w = m + size w0 by rewrite addnC.
+      by rewrite Hsize' addnK. 
+    - move=> H.
+      rewrite /pumping_closure_singleton_dlang in H.
+      case: ifP H=> Hlt H; first by [].
+      exact: (reachable_to_pumping_closure w0 _ _ H).
+Qed. 
 
-  Qed. 
   Variable w0 : word.
   Let n := size w0.
 

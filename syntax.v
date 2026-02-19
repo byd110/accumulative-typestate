@@ -1,127 +1,172 @@
 (* the basic syntax for checkol *)
 
 Require Import String.
-Require Import List.
-Import ListNotations.
-Require Import RegLang.
+Require Import Coq.Sets.Ensembles.
+From RecordUpdate Require Import RecordSet.
+From RecordUpdate Require Import RecordUpdate.
+From RegLang Require Import languages.
+Require Import ssreflect ssrfun ssrbool.
+From mathcomp Require Import all_ssreflect.
 
-(* Identifiers *)
+(* ------------------SYNTAX------------------*)
+Definition var : Type := nat.
+Definition method_name : Type := nat.
+Definition class_name : Type := nat.
 
-Definition var := nat.
-Definition class_name := nat.
-Definition field_name := nat.
-Definition method_name := nat.
-Definition address := nat.
+(* Protocol *)
+Parameter char : eqType.
+Definition eps : word char := [::].
+Definition protocol : Type := dlang char.
 
-(* Types *)
-Inductive ty : Type :=
-| TyObject
-| TyClass (cname : nat)().
 
-(* Expressions *)
+(* Definition r_a := { x : a | x = Assignable \/ x = Final}. *)
+
+(* Canonical projection for assignability *)
+(* Definition r_a_proj (x : r_a) : a := proj1_sig x. *)
+
+(* Qualified type  *)
+Record qualified_type := {
+  pi : protocol; (* Type qualifier *)
+  sctype: class_name; (* Class name *)
+}.
+
+Definition s_env := list qualified_type.
+
 Inductive expr : Type :=
-| EVar (x : )
+  | ENull : expr
+  | EVar : var -> expr
+  | EField : var -> var -> expr.
 
-(* Expressions *)
-Inductive expr : Type :=
-| EVar (x : var)
-| EInt (n : nat)
-| EBool (b : bool)
-| EField (e : expr) (f : field_name)
-| ECall (e : expr) (m : method_name) (args : list expr)
-| ENew (c : class_name) (args : list expr)
-| EBinOp (op : binop) (e1 e2 : expr)
-| EUnOp (op : unop) (e : expr)
+Inductive stmt: Type :=
+  | SSkip: stmt (* skip *)
+  | SLocal: class_name -> var -> stmt (* T x*)
+  | SVarAss: var -> expr -> stmt (* x = e *)
+  | SFldWrite: var -> var -> var -> stmt (* x.f = y *)
+  | SNew: var -> class_name -> list var -> stmt (* x = new q_c C(y1, ..., yn) *)
+  | SCall: var -> var -> method_name -> list var -> stmt (* x = y.m(z1, ..., zn) *)
+  (* | SCast: var -> q -> class_name -> var -> stmt x = (q C) y  *)
+  | SSeq: stmt -> stmt -> stmt. (* s1; s2 *)
 
-with binop : Type :=
-| OpAdd | OpSub | OpMul | OpDiv
-| OpEq | OpNeq | OpLt | OpLe | OpGt | OpGe
-| OpAnd | OpOr
+Definition field_type : Type := class_name.
 
-with unop : Type :=
-| OpNeg | OpNot.
-
-(* Statements *)
-Inductive stmt : Type :=
-| SSkip
-| SAssign (x : var) (e : expr)
-| SFieldAssign (e : expr) (f : field_name) (rhs : expr)
-| SSeq (s1 s2 : stmt)
-| SIf (cond : expr) (s_then s_else : stmt)
-| SWhile (cond : expr) (body : stmt)
-| SReturn (e : option expr).
-
-(* Method and class definitions *)
-Record param := {
-    param_name : var;
-    param_type : ty
+(* Field declaration with assignability and mutability *)
+Record field_def := {
+  ftype : field_type; (* Field type *)
+  fname : var; (* Field name, the name should match the index from the field list *)
 }.
 
-Record field := {
-    field_name_ : field_name;
-    field_type : ty
+Record constructor_body :={
+  super_call: list var; (* Super(f1, ..., fn)*)
+  assignments: list (var * var); (* this.f1 = f_1; ...; this.fn = f_n *)
 }.
 
-Record method := {
-    method_name_ : method_name;
-    method_params : list param;
-    method_ret_type : option ty;
-    method_body : stmt
+Record constructor_sig := {
+  sparams : list class_name; (* T x1, ..., T xn Parameters for super call *) (*s -> super*)
+  cparams : list class_name; (* T y1, ..., T yn Parameters for field assignment *) (*c -> current*)
 }.
 
-Record class := {
-    class_name_ : class_name;
-    class_fields : list field;
-    class_methods : list method
+Record constructor_def := {
+  csignature : constructor_sig; (* Constructor signature *)
+  cbody : constructor_body; (* Constructor body *)
 }.
 
-Definition program := list class.
+Record method_body := {
+  mbody_stmt: stmt; (* Method body expression *)
+  mreturn: var; (* Return variable *)
+}.
 
-Local Open Scope string_scope.
+Record method_sig := {
+  mret : qualified_type; (* Return type *)
+  mname : method_name; (* Method name *)
+  mreceiver: class_name; (*T this*)
+  mparams : list class_name; (* T x1, ..., T xn *)
+}.
 
-Example testname := "TestClass".
+Record method_def := {
+  msignature : method_sig; (* Method signature *)
+  mbody : method_body; (* Method body *)
+}.
 
+Record class_body := {
+  fields : list field_def; (* Class fields *)
+  constructor: constructor_def; (* Constructor declaration *)
+  methods : list method_def; (* Class methods *)
+}.
 
-(* Example 1: A simple Counter class *)
-Definition counter_class : class := {|
-    class_name_ := "Counter";
-    class_fields := [{| field_name_ := "value"; field_type := TyInt |}];
-    class_methods := [
-        {| method_name_ := "inc";
-             method_params := [];
-             method_ret_type := None;
-             method_body := SFieldAssign (EVar "this") "value"
-                 (EBinOp OpAdd (EField (EVar "this") "value") (EInt 1))
-        |};
-        {| method_name_ := "get";
-             method_params := [];
-             method_ret_type := Some TyInt;
-             method_body := SReturn (Some (EField (EVar "this") "value"))
-        |}
-    ]
-|}.
+Record class_sig := {
+  class_qualifier : protocol; (* Mutable, Immutable, or RDM *)
+  cname : class_name; (* Class name, need to be the same as the index from class_table *)
+  super : option class_name; (* Superclass name *)
+}.
 
-Definition counter_program : program := [counter_class].
+Record class_def := {
+  signature : class_sig; (* Class signature *)
+  body : class_body; (* Class body *)
+}.
 
-(* Example 2: A Pair class with swap method *)
-Definition pair_class : class := {|
-    class_name_ := "Pair";
-    class_fields := [
-        {| field_name_ := "fst"; field_type := TyInt |};
-        {| field_name_ := "snd"; field_type := TyInt |}
-    ];
-    class_methods := [
-        {| method_name_ := "swap";
-             method_params := [];
-             method_ret_type := None;
-             method_body :=
-                 SSeq
-                     (SAssign "tmp" (EField (EVar "this") "fst"))
-                     (SSeq
-                         (SFieldAssign (EVar "this") "fst" (EField (EVar "this") "snd"))
-                         (SFieldAssign (EVar "this") "snd" (EVar "tmp")))
-        |}
-    ]
-|}.
+Record program_def := {
+  classes: list class_def; (* List of class declarations *)
+  main_statement: stmt; (* Main statement *)
+}.
 
-Definition pair_program : program := [pair_class].
+(* Class table is a list of class declarations *)
+Definition class_table := list class_def.
+
+(* ------------------RUNTIME MODEL------------------*)
+
+(* Initialization state *)
+(* Inductive init: Type := 
+  | initing
+  | inited. *)
+
+(* Runtime protocol *)
+Definition protocol_r : Type := dlang char.
+
+(* Runtime conformance check *)
+Definition Prot_conf (pi : protocol) : bool :=
+  eps \in pi.
+
+(* Static qualified type *)
+(* Runtime type *)
+Record runtime_type := mkruntime_type {
+  rqtype: protocol_r; (* Runtime mutability *)
+  rctype: class_name; (* Class name *)
+}.
+
+(* Memory address *)
+Definition Loc : Type := nat.
+
+(* Runtime value *)
+Inductive value : Type :=
+  | Null_a : value
+  | Iot: Loc -> value.
+
+(* Field mapping *)
+Definition fields_mapping := list value. 
+Definition var_mapping   := list value.
+
+Record r_env := mkr_env {
+  vars: var_mapping; (* Variable mapping *)
+  (* Initialization state *)
+  (* init_state: init; *)
+}.
+
+(* Runtime object *)
+Record Obj := mkObj {
+  rt_type: runtime_type; (* Runtime type *)
+  fields_map: fields_mapping; (* Field mapping *)
+}.
+
+Definition heap          := list Obj.
+
+(* AOSEN: just a test *)
+(* Instance settable_r_env : Settable _ :=
+  mkSettable (generate_setters mkr_env vars init_state). *)
+Record test := mktest {
+  abc: nat;
+  bcd: nat;
+}.
+
+Definition example_env := mktest 42 1.
+
+Definition updated_env := example_env <|abc := 100|>.

@@ -1,8 +1,9 @@
--Q . MyProjec RegLang
+-Q . RegLang
 # -Q $(opam var lib)/coq/user-contrib/RegLang RegLang
 
 syntax.v
-protocol.v
+pumping.v
 semantics.v
 typestate.v
 soundness.v
+regularity.v

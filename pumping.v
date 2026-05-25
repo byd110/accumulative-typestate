@@ -34,7 +34,7 @@ Section FormalLanguage.
 
 End FormalLanguage.
 
-Section PumpingWord.
+Section Pumping.
   (* Placeholder for pumping word lemma or definitions *)
   (* Use types from RegLang/languages.v *)
   Variable char : finType.
@@ -72,7 +72,7 @@ Section PumpingWord.
     apply/hasP. exists 2. by []. apply/andP. split. by [].
     apply/hasP. exists 1. by []. apply/andP. by [].
   Qed.
-
+  
   (* The closure is defined with two cases: 
   1. the langauge L is in the closure,
   2. for any word in the closure, all the pumping word of that word are also in the closure *)
@@ -193,7 +193,7 @@ Section PumpingWord.
       rewrite addnS.
       by rewrite (subnKC hk).
       
-      have Hge : size w <= k.+1 by rewrite leqNgt Hlt. Search "leq_".
+      have Hge : size w <= k.+1 by rewrite leqNgt Hlt.
       have hke : k.+1 = size w. apply/eqP. by rewrite eqn_leq Hk Hge.
       by rewrite hke subnn addn1.
   Qed.
@@ -240,199 +240,118 @@ Proof.
       case: ifP H=> Hlt H; first by [].
       exact: (reachable_to_pumping_closure w0 _ _ H).
 Qed. 
+End Pumping.
 
-  Variable w0 : word.
-  Let n := size w0.
+Section PumpingClosureRegularity.
+  Variable char : finType.
+  Notation word := (RegLang.languages.word char).
+  Notation lang := (RegLang.languages.lang char).
+  Notation dlang := (RegLang.languages.dlang char).
 
-  (* 0..n states that track the longest matched prefix of w0 *)
-  Definition state := 'I_(n.+1).
-  Definition q0 : state := inord 0.
-  Definition is_final (q : state) : bool := (q == inord n).
+  Import RegLang.regexp.
+  
+  Notation regexp := (RegLang.regexp.regexp char).
+  Variable d0 : char.
 
-  (* alphabet test used in transitions *)
-  Definition sym_eq_nth (k : nat) (c : char) : bool := (c == nth d0 w0 k).
+  (* Finite set of letters available up to prefix length j+1 (capped at |w0|) *)
+  Definition sigma (w0 : word) (j : nat) : {set char} :=
+    [set x
+     | x \in [seq nth d0 w0 k
+              | k <- iota 0 (minn j.+1 (size w0))] ].
 
-  (* NFA transitions from j on symbol c:
-     - copy to any k <= j where c == w0[k]
-     - advance to j+1 if j < n and c == w0[j] *)
-  Definition nfa_delta (j : state) (c : char) : seq state :=
-    let jn := val j in
-    let copies := [seq inord k | k <- iota 0 jn.+1] in
-    let copies' := [seq s <- copies | sym_eq_nth (val s) c] in
-    let adv := if (jn < n) && sym_eq_nth jn c then [:: inord jn.+1] else [::] in
-    copies' ++ adv.
+  Notation collection := {set {set char}}.
+  
+  (* Symbol Collection: the set of?> mmmm symbol collections possibly available for given regex *)
+  Fixpoint symbol_collections (r : regexp) : collection :=
+    match r with
+    | Void => set0
+    | Eps => set0
+    | Atom c => [set [set c]]
+    | Plus r1 r2 => symbol_collections r1 :|: symbol_collections r2
+    | Conc r1 r2 => [set (S1 :|: S2) | S1 in symbol_collections r1, S2 in symbol_collections r2]
+    | Star r => set0 :|: symbol_collections r :|: [set (S1 :|: S2) | S1 in symbol_collections r, S2 in symbol_collections r]
+    end.
 
-  (* NFA acceptance as a boolean (epsilon-free, so list search suffices) *)
-  Fixpoint nfa_accepts_aux (q : state) (u : word) : bool :=
-    if u is x :: xs
-    then has (fun t => nfa_accepts_aux t xs) (nfa_delta q x)
-    else is_final q.
+  (* Union of sigleton symbols from the alphabet `X` *)
+  Definition re_of_set (X : {set char}) : regexp :=
+    \big[@Plus char / @Void char]_(c in X)
+      (Atom c).
+  
+  (* The pumping semantic for a singleton symbol `c` and a collection of symbol sets `o`:
+    Union of Kleene stars, where each star is the symbol `c` followed by the union of symbols from symbol sets `A`
+    from `o` unioned with the singleton `{c}` *)
+  Definition atom_pump_out (c : char) (o : collection) : regexp :=
+  \big[@Plus char / @Void char]_(A in o)
+    (Conc (Atom c) (Star (re_of_set (A :|: [set c])))).
 
-  Definition nfa_accepts (w : word) : bool := nfa_accepts_aux q0 w.
+  Inductive pump_semantic : regexp -> collection -> regexp -> Prop :=
+  | pt_void o: 
+      pump_semantic Void o Void
+  | pt_eps o: 
+      pump_semantic Eps o Eps
+  | pt_atom c o: 
+      pump_semantic (Atom c) o (atom_pump_out c o)
+  | pt_plus r1 r2 out1 out2 o: 
+      pump_semantic r1 o out1 ->
+      pump_semantic r2 o out2 ->
+      pump_semantic (Plus r1 r2) o (Plus out1 out2)
+  | pt_conc r1 r2 out1 out2 o: 
+      pump_semantic r1 o out1 ->
+      pump_semantic r2 (o :|: symbol_collections r1) out2 ->
+      pump_semantic (Conc r1 r2) o (Conc out1 out2)
+  | pt_star r out o:
+      pump_semantic r o out ->
+      pump_semantic (Star r) o Eps.
+    
+  (* S0* · w0[0] · S1* · w0[1] · ... · S_{n-1}* · w0[n-1] · Sn*  *)
+  Definition pumping_re (w0 : word) : RegLang.regexp.regexp char :=
+    let n := size w0 in
+    let fix build (j : nat) :=
+      match j with
+      | 0 =>
+          RegLang.regexp.Star (re_of_set (sigma w0 0))
+      | j'.+1 =>
+          RegLang.regexp.Conc
+            (build j')
+            (RegLang.regexp.Conc
+               (RegLang.regexp.Atom (nth d0 w0 j'))
+               (RegLang.regexp.Star (re_of_set (sigma w0 j'.+1))))
+      end
+    in build n.
 
-  (* key equivalence: the NFA recognizes the same language as your decidable closure *)
-  Lemma nfa_accepts_eq_pumping_closure_dlang (w : word) :
-    nfa_accepts w = pumping_closure_dlang w0 w.
+  (* This is the main semantic lemma you need to prove (by an invariant / induction on j). *)
+  Lemma pumping_re_correct (w0 w : word) :
+    @pumping_closure_singleton_dlang char d0 w0 w <-> (w \in pumping_re w0).
   Proof.
-    (* Sketch:
-       - Prove a stronger invariant: for any j, nfa_accepts_aux j w iff
-         size w >= (n - j) and reachable (size w - (n - j)) (drop j w0) w,
-         where the “reachable” is your step semantics, generalized from the seed.
-       - Instantiate with j = 0 and simplify.
-       Use structural induction on w. Each step matches your pumping “copy-or-advance”
-       and is mirrored by the transition structure. *)
+    (* TODO:
+       Prove “reachable (|w|-|w0|) w0 w” iff w matches the staged decomposition:
+         - before seeing w0[0], only Sj 0 letters can appear (actually Sj 0 is {w0[0]})
+         - between w0[j] and w0[j+1], only Sj j letters can be inserted
+         - after finishing w0, only Sj n letters can be inserted
+       This is exactly what pumping_re encodes. *)
   Admitted.
 
-  (* Approach B: regularity via a regular expression decomposition *)
-    (* For each prefix j, the “stay” alphabet is the finite set S_j = {w0[k] | k ≤ j} *)
-    Definition Sj (j : nat) : {set char} :=
-    [set x | x \in [seq nth d0 w0 k | k <- iota 0 (minn (j.+1) (size w0))]].
-
-    (* Regex for a finite set X: big union of singletons *)
-    Definition re_of_set (X : {set char}) : RegLang.regexp.regexp char :=
-      \big[RegLang.regexp.alt/RegLang.regexp.empty]_(c in X) RegLang.regexp.char c.
-
-    (* Product regex: S0* · w0[0] · S1* · w0[1] · ... · Sn* *)
-    Definition pumping_re : RegLang.regexp.regexp char :=
-      let fix build (j : nat) :=
-        match j with
-        | 0    => RegLang.regexp.star (re_of_set (Sj 0))
-        | j'.+1 =>
-            RegLang.regexp.cat
-              (build j')
-              (RegLang.regexp.cat
-                 (RegLang.regexp.char (nth d0 w0 j'))
-                 (RegLang.regexp.star (re_of_set (Sj j'.+1))))
-        end in build n.
-
-    (* Semantics of the regex matches your decidable predicate *)
-    Lemma pumping_re_correct (w : word) :
-      RegLang.regexp.matches pumping_re w = pumping_closure_dlang w0 w.
-    Proof.
-      (* Induction over j with the invariant that “state j” language equals
-         Sj* · w0[j] · Sj+1* · ... · Sn*; combine:
-         - correctness of star/cat/alt semantics,
-         - that Sj enumerates exactly the letters allowed by the pumping step,
-         - and size-indexed reachable equals “number of steps” in your definition. *)
-    Admitted.
-
-    Theorem pumping_closure_singleton_regular_RE :
-      RegLang.languages.regular (pumping_closure_dlang w0).
-    Proof.
-      (* RegLang provides that every regexp denotes a regular language *)
-      have -> : pumping_closure_dlang w0 =1 RegLang.regexp.matches pumping_re.
-      { by move=> w; rewrite -pumping_re_correct. }
-      exact: RegLang.regexp.regular_of_regexp.
-    Qed.
-
-  (* Pick either theorem as the final statement. *)
-  Theorem pumping_closure_singleton_regular :
-    RegLang.languages.regular (pumping_closure_dlang w0).
-  Proof. exact: pumping_closure_singleton_regular_RE. Qed.
-
-(* Approach A: regularity via NFA -> DFA (subset construction in RegLang) *)
-    (* Reuse RegLang's NFA API; names below follow RegLang/nfa.v and dfa.v.
-       If names differ locally, adapt according to your install. *)
-
-    (* Package the finite NFA structure expected by RegLang. *)
-    (* States carry an eqType structure; 'I_(n.+1) has one already. *)
-    Definition NFA_states := state.
-    Definition NFA_start : NFA_states := q0.
-    Definition NFA_final : {set NFA_states} := [set inord n].
-    Definition NFA_step (q : NFA_states) (a : char) : {set NFA_states} :=
-      [set t | t \in nfa_delta q a].
-
-    Definition my_nfa : nfa char :=
-      NFA.mk NFA_states NFA_start NFA_final NFA_step.
-
-    (* Show the library NFA language equals nfa_accepts. *)
-    Lemma nfa_lang_eq_accepts : RegLang.nfa.nfa_lang my_nfa =1 nfa_accepts.
-    Proof.
-      (* Unfold nfa_lang (path semantics) and show it coincides with
-         nfa_accepts_aux; standard “has over step set” vs. small-step
-         list recursion equivalence. *)
-    Admitted.
-
-    (* Conclude regularity using RegLang’s determinization theorem. *)
-    Theorem pumping_closure_singleton_regular_NFA :
-      RegLang.languages.regular (pumping_closure_dlang w0).
-    Proof.
-      (* determinize my_nfa to a DFA and use correctness *)
-      have -> : pumping_closure_dlang w0 =1 nfa_accepts.
-      { move=> w; rewrite -nfa_accepts_eq_pumping_closure_dlang. by []. }
-      have -> : nfa_accepts =1 RegLang.nfa.nfa_lang my_nfa.
-      { by move=> w; rewrite -nfa_lang_eq_accepts. }
-      (* RegLang provides: regular (nfa_lang N) via subset construction *)
-      exact: RegLang.nfa.nfa_regular.
-    Qed.
-
-  (* Variable w0 : word.
-  Let n := size w0.
-
-  (* finite states 0 .. n *)
-  Definition state := 'I_(n.+1).
-
-  (* convenience: ordinal -> nat *)
-  Definition state_to_nat (s : state) : nat := val s.
-
-  (* final/accepting state: n *)
-  Definition is_final (s : state) : bool := (s == inord n).
-
-  (* compare a character with nth char of w0 at index k *)
-  Definition sym_eq_nth (k : nat) (c : char) : bool := (c == nth d0 w0 k).
-
-  (* transitions from state j on symbol c:
-      - copy transitions to every k <= j where c == nth w0 k
-      - advance transition to j+1 if j < n and c == nth w0 j
-      We enumerate targets as a seq state so acceptance can be defined by has/exists.
-      (Implementation uses iota/map/filter; proofs about indexes will use mem_iota.) *)
-  Definition delta (j : state) (c : char) : seq state :=
-    let jn := state_to_nat j in
-    let copies := map inord (iota 0 jn.+1) in
-    let copies' := filter (fun s => sym_eq_nth (state_to_nat s) c) copies in
-    let adv := if (jn < n) && sym_eq_nth jn c then [:: inord jn.+1] else [::] in
-    copies' ++ adv.
-
-  (* acceptance as a recursive boolean predicate over input word *)
-  Fixpoint accepts_aux (s : state) (u : word) : bool :=
-    if u is x :: xs
-    then has (fun t => (t \in delta s x) && accepts_aux t xs) (delta s x)
-    else is_final s.
-
-  Definition accepts (w : word) : bool := accepts_aux (inord 0) w.
-
-  (* Soundness: if automaton accepts w then reachable (size w - n) w0 w *)
-  Lemma accepts_sound (w : word) :
-    accepts w -> size w >= n /\ reachable (size w - n) w0 w.
-  Proof. admit. Qed.
-
-  (* Completeness: if reachable (size w - n) w0 w then automaton accepts w *)
-  Lemma accepts_complete (w : word) :
-    size w >= n -> reachable (size w - n) w0 w -> accepts w.
-  Proof. admit. Qed.
-
-  (* Pointwise boolean equality between accepts and pumping_closure_dlang *)
-  Lemma accepts_eq_pumping_closure_dlang (w : word) :
-    accepts w = (if size w < n then false else reachable (size w - n) w0 w).
+  (* Regularity of the decidable singleton closure language *)
+  Theorem pumping_closure_singleton_regular (w0 : word) :
+    RegLang.dfa.regular (fun w => @pumping_closure_singleton_dlang char d0 w0 w).
   Proof.
-    rewrite /accepts.
-    case: ifP => Hlt.
-    - (* size w < n -> both sides false (automaton cannot reach final) *)
-      admit.
-    - (* size w >= n: use soundness/completeness to equate booleans *)
-      admit.
-  Admitted.
 
-  (* Conclude regularity: pumping_closure_dlang w0 is recognised by this finite automaton.
-      Here we state the theorem in terms of RegLang's notion of regularity.
-      Use RegLang.nfa / languages results to finish the formal connection. *)
-  Theorem pumping_closure_singleton_regular (w0' : word) :
-    w0' = w0 -> RegLang.languages.regular (pumping_closure_dlang w0).
+    case: (@regularP char
+      (fun w : word => is_true (@pumping_closure_singleton_dlang char d0 w0 w)))
+      => _ Hregular.
+    apply: Hregular.
+    exists (pumping_re w0) => w.
+    exact: pumping_re_correct.
+  Qed.
+
+  (* Regularity of the inductive (Prop) pumping_closure, via regular_ext + singleton_eq *)
+  Theorem pumping_closure_regular (w0 : word) :
+    RegLang.dfa.regular (fun w => @pumping_closure char d0 (pred1 w0) w).
   Proof.
-    move=> ->.
-    (* replace pumping_closure_dlang by accepts using accepts_eq_pumping_closure_dlang,
-        then build a RegLang.nfa from the finite structure {0..n} with delta/is_final and
-        use the library lemma that nfa-recognisable => regular. *)
-    admit.
-  Qed. *)
-End PumpingWord.
+    apply: (RegLang.dfa.regular_ext (L2 := fun w =>
+      @pumping_closure_singleton_dlang char d0 w0 w)
+      (pumping_closure_singleton_regular w0)).
+    move=> w; exact: (@pumping_closure_singleton_eq char d0 w0 w).
+  Qed.
+
+End PumpingClosureRegularity.

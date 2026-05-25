@@ -260,6 +260,24 @@ Section PumpingClosureRegularity.
               | k <- iota 0 (minn j.+1 (size w0))] ].
 
   Notation collection := {set {set char}}.
+
+  Definition union_of (S : collection) : {set char} :=
+    \big[@setU char / set0]_(A in S) A.
+
+  Definition collection_product (C D : collection) : collection :=
+    [set (A :|: B) | A in C, B in D].
+
+  Definition collection_star (C : collection) : collection :=
+    [set union_of S | S in [set S : collection | S \subset C]].
+
+  Lemma collection_starP (C : collection) (A : {set char}) :
+    reflect (exists2 S : collection, S \subset C & A = union_of S)
+      (A \in collection_star C).
+  Proof.
+    apply: (iffP imsetP) => [[S HS ->] | [S HS ->]].
+    - by exists S; rewrite inE in HS.
+    - by exists S; rewrite ?inE.
+  Qed.
   
   (* Symbol Collection: the set of?> mmmm symbol collections possibly available for given regex *)
   Fixpoint symbol_collections (r : regexp) : collection :=
@@ -268,9 +286,15 @@ Section PumpingClosureRegularity.
     | Eps => set0
     | Atom c => [set [set c]]
     | Plus r1 r2 => symbol_collections r1 :|: symbol_collections r2
-    | Conc r1 r2 => [set (S1 :|: S2) | S1 in symbol_collections r1, S2 in symbol_collections r2]
-    | Star r => set0 :|: symbol_collections r :|: [set (S1 :|: S2) | S1 in symbol_collections r, S2 in symbol_collections r]
+    | Conc r1 r2 => collection_product (symbol_collections r1) (symbol_collections r2)
+    | Star r => collection_star (symbol_collections r)
     end.
+
+  Lemma symbol_collections_starP (r : regexp) (A : {set char}) :
+    reflect
+      (exists2 S : collection, S \subset symbol_collections r & A = union_of S)
+      (A \in symbol_collections (Star r)).
+  Proof. exact: collection_starP. Qed.
 
   (* Union of sigleton symbols from the alphabet `X` *)
   Definition re_of_set (X : {set char}) : regexp :=
@@ -297,11 +321,59 @@ Section PumpingClosureRegularity.
       pump_semantic (Plus r1 r2) o (Plus out1 out2)
   | pt_conc r1 r2 out1 out2 o: 
       pump_semantic r1 o out1 ->
-      pump_semantic r2 (o :|: symbol_collections r1) out2 ->
+      pump_semantic r2 (collection_product o (symbol_collections r1)) out2 ->
       pump_semantic (Conc r1 r2) o (Conc out1 out2)
   | pt_star r out o:
       pump_semantic r o out ->
-      pump_semantic (Star r) o Eps.
+      pump_semantic
+        (Star r) o
+        (Plus Eps
+          (Conc out
+            (Star out))).
+
+  Inductive staged_expansion : {set char} -> word -> word -> Prop :=
+  | staged_nil A :
+      staged_expansion A [::] [::]
+  | staged_cons A a u extras w :
+      all (fun c => c \in A :|: [set a]) extras ->
+      staged_expansion (A :|: [set a]) u w ->
+      staged_expansion A (a :: u) (a :: (extras ++ w)).
+
+  Definition universal_invariant (r : regexp) (o : collection) (w : word) :=
+    exists A u, [/\ A \in o, u \in r & staged_expansion A u w].
+
+  Lemma pump_semantic_regular (r out : regexp) (o : collection) :
+    pump_semantic r o out ->
+    RegLang.dfa.regular (fun w : word => is_true (w \in out)).
+  Proof.
+    move=> _.
+    case: (@regularP char (fun w : word => is_true (w \in out)))
+      => _ Hregular.
+    apply: Hregular.
+    by exists out.
+  Qed.
+
+  Lemma singleton_pump_semantic_exists (w0 : word) (o : collection) :
+    { out : regexp | pump_semantic (String w0) o out }.
+  Proof.
+    elim: w0 o => [|a w0 IHw] o /=.
+    - by exists Eps; exact: pt_eps.
+    - case: (IHw (collection_product o (symbol_collections (Atom a)))) => out Hout.
+      exists (Conc (atom_pump_out a o) out).
+      apply: pt_conc.
+      + exact: pt_atom.
+      + exact: Hout.
+  Qed.
+
+  Theorem singleton_pump_semantic_regular (w0 : word) :
+    { out : regexp &
+      pump_semantic (String w0) [set set0] out *
+      RegLang.dfa.regular (fun w : word => is_true (w \in out)) }%type.
+  Proof.
+    case: (singleton_pump_semantic_exists w0 [set set0]) => out Hout.
+    exists out; split=> //.
+    exact: pump_semantic_regular Hout.
+  Qed.
     
   (* S0* · w0[0] · S1* · w0[1] · ... · S_{n-1}* · w0[n-1] · Sn*  *)
   Definition pumping_re (w0 : word) : RegLang.regexp.regexp char :=

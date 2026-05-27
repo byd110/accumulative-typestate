@@ -301,35 +301,45 @@ Section PumpingClosureRegularity.
     \big[@Plus char / @Void char]_(c in X)
       (Atom c).
   
-  (* The pumping semantic for a singleton symbol `c` and a collection of symbol sets `o`:
-    Union of Kleene stars, where each star is the symbol `c` followed by the union of symbols from symbol sets `A`
-    from `o` unioned with the singleton `{c}` *)
-  Definition atom_pump_out (c : char) (o : collection) : regexp :=
-  \big[@Plus char / @Void char]_(A in o)
-    (Conc (Atom c) (Star (re_of_set (A :|: [set c])))).
+  (* Exact-branch semantics: start with exactly `A`, end with exactly `B`. *)
+  Definition atom_branch_out (c : char) (A : {set char}) : regexp :=
+    Conc (Atom c) (Star (re_of_set (A :|: [set c]))).
 
-  Inductive pump_semantic : regexp -> collection -> regexp -> Prop :=
-  | pt_void o: 
-      pump_semantic Void o Void
-  | pt_eps o: 
-      pump_semantic Eps o Eps
-  | pt_atom c o: 
-      pump_semantic (Atom c) o (atom_pump_out c o)
-  | pt_plus r1 r2 out1 out2 o: 
-      pump_semantic r1 o out1 ->
-      pump_semantic r2 o out2 ->
-      pump_semantic (Plus r1 r2) o (Plus out1 out2)
-  | pt_conc r1 r2 out1 out2 o: 
-      pump_semantic r1 o out1 ->
-      pump_semantic r2 (collection_product o (symbol_collections r1)) out2 ->
-      pump_semantic (Conc r1 r2) o (Conc out1 out2)
-  | pt_star r out o:
-      pump_semantic r o out ->
-      pump_semantic
-        (Star r) o
-        (Plus Eps
-          (Conc out
-            (Star out))).
+  Inductive pump_branch : regexp -> {set char} -> {set char} -> regexp -> Prop :=
+  | pb_eps A :
+      pump_branch Eps A A Eps
+  | pb_atom A c :
+      pump_branch (Atom c) A (A :|: [set c]) (atom_branch_out c A)
+  | pb_plus_l r1 r2 A B out :
+      pump_branch r1 A B out ->
+      pump_branch (Plus r1 r2) A B out
+  | pb_plus_r r1 r2 A B out :
+      pump_branch r2 A B out ->
+      pump_branch (Plus r1 r2) A B out
+  | pb_conc r1 r2 A B C out1 out2 :
+      pump_branch r1 A B out1 ->
+      pump_branch r2 B C out2 ->
+      pump_branch (Conc r1 r2) A C (Conc out1 out2)
+  | pb_star0 r A :
+      pump_branch (Star r) A A Eps
+  | pb_starS r A B C out1 out2 :
+      pump_branch r A B out1 ->
+      pump_branch (Star r) B C out2 ->
+      pump_branch (Star r) A C (Conc out1 out2).
+
+  (* Collection-level semantics: finite unions of exact correlated branches. *)
+  Inductive pump_semantic : regexp -> collection -> collection -> regexp -> Prop :=
+  | pt_branch r (o : collection) A B out:
+      A \in o ->
+      pump_branch r A B out ->
+      pump_semantic r o [set B] out
+  | pt_union r (o o1 o2 : collection) out1 out2:
+      pump_semantic r o o1 out1 ->
+      pump_semantic r o o2 out2 ->
+      pump_semantic r o (o1 :|: o2) (Plus out1 out2).
+
+  Fixpoint word_symbols (u : word) : {set char} :=
+    if u is a :: u' then [set a] :|: word_symbols u' else set0.
 
   Inductive staged_expansion : {set char} -> word -> word -> Prop :=
   | staged_nil A :
@@ -339,11 +349,20 @@ Section PumpingClosureRegularity.
       staged_expansion (A :|: [set a]) u w ->
       staged_expansion A (a :: u) (a :: (extras ++ w)).
 
-  Definition universal_invariant (r : regexp) (o : collection) (w : word) :=
-    exists A u, [/\ A \in o, u \in r & staged_expansion A u w].
+  Definition branch_invariant
+      (r : regexp) (A B : {set char}) (w : word) :=
+    exists u,
+      [/\ u \in r, B = A :|: word_symbols u
+        & staged_expansion A u w].
 
-  Lemma pump_semantic_regular (r out : regexp) (o : collection) :
-    pump_semantic r o out ->
+  Definition universal_invariant
+      (r : regexp) (o o' : collection) (w : word) :=
+    exists A u,
+      [/\ A \in o, A :|: word_symbols u \in o', u \in r
+        & staged_expansion A u w].
+
+  Lemma pump_branch_regular (r : regexp) A B out :
+    pump_branch r A B out ->
     RegLang.dfa.regular (fun w : word => is_true (w \in out)).
   Proof.
     move=> _.
@@ -353,25 +372,48 @@ Section PumpingClosureRegularity.
     by exists out.
   Qed.
 
-  Lemma singleton_pump_semantic_exists (w0 : word) (o : collection) :
-    { out : regexp | pump_semantic (String w0) o out }.
+  Lemma pump_semantic_regular (r : regexp) o o' out :
+    pump_semantic r o o' out ->
+    RegLang.dfa.regular (fun w : word => is_true (w \in out)).
   Proof.
-    elim: w0 o => [|a w0 IHw] o /=.
-    - by exists Eps; exact: pt_eps.
-    - case: (IHw (collection_product o (symbol_collections (Atom a)))) => out Hout.
-      exists (Conc (atom_pump_out a o) out).
-      apply: pt_conc.
-      + exact: pt_atom.
+    move=> _.
+    case: (@regularP char (fun w : word => is_true (w \in out)))
+      => _ Hregular.
+    apply: Hregular.
+    by exists out.
+  Qed.
+
+  Lemma string_pump_branch_exists (w0 : word) A :
+    { Bo : {set char} * regexp |
+      pump_branch (String w0) A Bo.1 Bo.2 }.
+  Proof.
+    elim: w0 A => [|a w0 IHw] A /=.
+    - exists (A, Eps). exact: pb_eps.
+    - case: (IHw (A :|: [set a])) => [[B out] Hout].
+      exists (B, Conc (atom_branch_out a A) out).
+      apply: pb_conc.
+      + exact: pb_atom.
       + exact: Hout.
   Qed.
 
-  Theorem singleton_pump_semantic_regular (w0 : word) :
-    { out : regexp &
-      pump_semantic (String w0) [set set0] out *
-      RegLang.dfa.regular (fun w : word => is_true (w \in out)) }%type.
+  Lemma singleton_pump_semantic_exists (w0 : word) :
+    { oo : collection * regexp |
+      pump_semantic (String w0) [set set0] oo.1 oo.2 }.
   Proof.
-    case: (singleton_pump_semantic_exists w0 [set set0]) => out Hout.
-    exists out; split=> //.
+    case: (string_pump_branch_exists w0 set0) => [[B out] Hout].
+    exists ([set B], out).
+    apply: pt_branch.
+    - by rewrite inE.
+    - exact: Hout.
+  Qed.
+
+  Theorem singleton_pump_semantic_regular (w0 : word) :
+    { oo : collection * regexp &
+      pump_semantic (String w0) [set set0] oo.1 oo.2 *
+      RegLang.dfa.regular (fun w : word => is_true (w \in oo.2)) }%type.
+  Proof.
+    case: (singleton_pump_semantic_exists w0) => [[o out] Hout].
+    exists (o, out); split=> //.
     exact: pump_semantic_regular Hout.
   Qed.
     

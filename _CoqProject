@@ -6,4 +6,3 @@ pumping.v
 semantics.v
 typestate.v
 soundness.v
-regularity.v

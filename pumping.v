@@ -253,219 +253,302 @@ Section PumpingClosureRegularity.
   Notation regexp := (RegLang.regexp.regexp char).
   Variable d0 : char.
 
-  (* Finite set of letters available up to prefix length j+1 (capped at |w0|) *)
-  Definition sigma (w0 : word) (j : nat) : {set char} :=
-    [set x
-     | x \in [seq nth d0 w0 k
-              | k <- iota 0 (minn j.+1 (size w0))] ].
-
-  Notation collection := {set {set char}}.
-
-  Definition union_of (S : collection) : {set char} :=
-    \big[@setU char / set0]_(A in S) A.
-
-  Definition collection_product (C D : collection) : collection :=
-    [set (A :|: B) | A in C, B in D].
-
-  Definition collection_star (C : collection) : collection :=
-    [set union_of S | S in [set S : collection | S \subset C]].
-
-  Lemma collection_starP (C : collection) (A : {set char}) :
-    reflect (exists2 S : collection, S \subset C & A = union_of S)
-      (A \in collection_star C).
-  Proof.
-    apply: (iffP imsetP) => [[S HS ->] | [S HS ->]].
-    - by exists S; rewrite inE in HS.
-    - by exists S; rewrite ?inE.
-  Qed.
-  
-  (* Symbol Collection: the set of?> mmmm symbol collections possibly available for given regex *)
-  Fixpoint symbol_collections (r : regexp) : collection :=
-    match r with
-    | Void => set0
-    | Eps => set0
-    | Atom c => [set [set c]]
-    | Plus r1 r2 => symbol_collections r1 :|: symbol_collections r2
-    | Conc r1 r2 => collection_product (symbol_collections r1) (symbol_collections r2)
-    | Star r => collection_star (symbol_collections r)
-    end.
-
-  Lemma symbol_collections_starP (r : regexp) (A : {set char}) :
-    reflect
-      (exists2 S : collection, S \subset symbol_collections r & A = union_of S)
-      (A \in symbol_collections (Star r)).
-  Proof. exact: collection_starP. Qed.
-
-  (* Union of sigleton symbols from the alphabet `X` *)
+  (* Union of singleton symbols from the alphabet `X` *)
   Definition re_of_set (X : {set char}) : regexp :=
     \big[@Plus char / @Void char]_(c in X)
       (Atom c).
-  
-  (* Exact-branch semantics: start with exactly `A`, end with exactly `B`. *)
-  Definition atom_branch_out (c : char) (A : {set char}) : regexp :=
-    Conc (Atom c) (Star (re_of_set (A :|: [set c]))).
 
-  Inductive pump_branch : regexp -> {set char} -> {set char} -> regexp -> Prop :=
-  | pb_eps A :
-      pump_branch Eps A A Eps
-  | pb_atom A c :
-      pump_branch (Atom c) A (A :|: [set c]) (atom_branch_out c A)
-  | pb_plus_l r1 r2 A B out :
-      pump_branch r1 A B out ->
-      pump_branch (Plus r1 r2) A B out
-  | pb_plus_r r1 r2 A B out :
-      pump_branch r2 A B out ->
-      pump_branch (Plus r1 r2) A B out
-  | pb_conc r1 r2 A B C out1 out2 :
-      pump_branch r1 A B out1 ->
-      pump_branch r2 B C out2 ->
-      pump_branch (Conc r1 r2) A C (Conc out1 out2)
-  | pb_star0 r A :
-      pump_branch (Star r) A A Eps
-  | pb_starS r A B C out1 out2 :
-      pump_branch r A B out1 ->
-      pump_branch (Star r) B C out2 ->
-      pump_branch (Star r) A C (Conc out1 out2).
+  Definition regex_lang (r : regexp) : dlang :=
+    [pred w | w \in r].
 
-  (* Collection-level semantics: finite unions of exact correlated branches. *)
-  Inductive pump_semantic : regexp -> collection -> collection -> regexp -> Prop :=
-  | pt_branch r (o : collection) A B out:
-      A \in o ->
-      pump_branch r A B out ->
-      pump_semantic r o [set B] out
-  | pt_union r (o o1 o2 : collection) out1 out2:
-      pump_semantic r o o1 out1 ->
-      pump_semantic r o o2 out2 ->
-      pump_semantic r o (o1 :|: o2) (Plus out1 out2).
+  Definition closure_equiv (r s : regexp) :=
+    forall w,
+      @pumping_closure char d0 (regex_lang r) w <->
+      @pumping_closure char d0 (regex_lang s) w.
+
+  Fixpoint regexp_power (n : nat) (r : regexp) : regexp :=
+    if n is n'.+1 then Conc r (regexp_power n' r) else Eps.
+
+  Definition bounded_star_basis (r : regexp) : regexp :=
+    \big[@Plus char / @Void char]_(k : 'I_(#|char|).+1)
+      (regexp_power k r).
+
+  Lemma bounded_star_basisP (r : regexp) (w : word) :
+    reflect
+      (exists k : 'I_(#|char|).+1, w \in regexp_power k r)
+      (w \in bounded_star_basis r).
+  Proof.
+    rewrite /bounded_star_basis.
+    apply: (iffP (big_plusP _ _ _)) => [[k _ Hk] | [k Hk]].
+    - by exists k.
+    - by exists k.
+  Qed.
+
+  Lemma pumping_closure_monotone (L1 L2 : dlang) :
+    {subset L1 <= L2} ->
+    forall w,
+      @pumping_closure char d0 L1 w ->
+      @pumping_closure char d0 L2 w.
+  Proof.
+    move=> Hsub w Hclos.
+    elim: Hclos => [u Hu | u v _ IH Hpump].
+    - exact: pumping_closure_base (Hsub _ Hu).
+    - exact: pumping_closure_step IH Hpump.
+  Qed.
+
+  Lemma pumping_closure_lift_singleton (L : dlang) (u w : word) :
+    L u ->
+    @pumping_closure char d0 (pred1 u) w ->
+    @pumping_closure char d0 L w.
+  Proof.
+    move=> Hu Hclos.
+    elim: Hclos => [v Hv | v v' _ IH Hpump].
+    - move/eqP: Hv => ->. exact: pumping_closure_base Hu.
+    - exact: pumping_closure_step IH Hpump.
+  Qed.
+
+  Lemma pumping_closure_lift_closure (L : dlang) (u w : word) :
+    @pumping_closure char d0 L u ->
+    @pumping_closure char d0 (pred1 u) w ->
+    @pumping_closure char d0 L w.
+  Proof.
+    move=> Hu Hclos.
+    elim: Hclos => [v Hv | v v' _ IH Hpump].
+    - move/eqP: Hv => ->. exact: Hu.
+    - exact: pumping_closure_step IH Hpump.
+  Qed.
+
+  Lemma regexp_power_in_star (r : regexp) n (w : word) :
+    w \in regexp_power n r -> w \in Star r.
+  Proof.
+    elim: n w => [|n IH] w /=.
+    - by move/eqP=> ->.
+    - case/concP=> w1 [w2 [-> [Hw1 Hw2]]].
+      exact: star_cat Hw1 (IH _ Hw2).
+  Qed.
+
+  Lemma bounded_star_basis_in_star (r : regexp) (w : word) :
+    w \in bounded_star_basis r -> w \in Star r.
+  Proof.
+    case/bounded_star_basisP=> k Hk.
+    exact: regexp_power_in_star Hk.
+  Qed.
 
   Fixpoint word_symbols (u : word) : {set char} :=
     if u is a :: u' then [set a] :|: word_symbols u' else set0.
 
-  Inductive staged_expansion : {set char} -> word -> word -> Prop :=
-  | staged_nil A :
-      staged_expansion A [::] [::]
-  | staged_cons A a u extras w :
-      all (fun c => c \in A :|: [set a]) extras ->
-      staged_expansion (A :|: [set a]) u w ->
-      staged_expansion A (a :: u) (a :: (extras ++ w)).
-
-  Definition branch_invariant
-      (r : regexp) (A B : {set char}) (w : word) :=
-    exists u,
-      [/\ u \in r, B = A :|: word_symbols u
-        & staged_expansion A u w].
-
-  Definition universal_invariant
-      (r : regexp) (o o' : collection) (w : word) :=
-    exists A u,
-      [/\ A \in o, A :|: word_symbols u \in o', u \in r
-        & staged_expansion A u w].
-
-  Lemma pump_branch_regular (r : regexp) A B out :
-    pump_branch r A B out ->
-    RegLang.dfa.regular (fun w : word => is_true (w \in out)).
+  Lemma word_symbols_cat (u v : word) :
+    word_symbols (u ++ v) = word_symbols u :|: word_symbols v.
   Proof.
-    move=> _.
-    case: (@regularP char (fun w : word => is_true (w \in out)))
-      => _ Hregular.
-    apply: Hregular.
-    by exists out.
+    elim: u => [|a u IH] /=.
+    - by rewrite set0U.
+    - by rewrite IH setUA.
   Qed.
 
-  Lemma pump_semantic_regular (r : regexp) o o' out :
-    pump_semantic r o o' out ->
-    RegLang.dfa.regular (fun w : word => is_true (w \in out)).
+  Lemma mem_word_symbols (u : word) c :
+    c \in word_symbols u = (c \in u).
   Proof.
-    move=> _.
-    case: (@regularP char (fun w : word => is_true (w \in out)))
-      => _ Hregular.
-    apply: Hregular.
-    by exists out.
-  Qed.
-
-  Lemma string_pump_branch_exists (w0 : word) A :
-    { Bo : {set char} * regexp |
-      pump_branch (String w0) A Bo.1 Bo.2 }.
-  Proof.
-    elim: w0 A => [|a w0 IHw] A /=.
-    - exists (A, Eps). exact: pb_eps.
-    - case: (IHw (A :|: [set a])) => [[B out] Hout].
-      exists (B, Conc (atom_branch_out a A) out).
-      apply: pb_conc.
-      + exact: pb_atom.
-      + exact: Hout.
-  Qed.
-
-  Lemma singleton_pump_semantic_exists (w0 : word) :
-    { oo : collection * regexp |
-      pump_semantic (String w0) [set set0] oo.1 oo.2 }.
-  Proof.
-    case: (string_pump_branch_exists w0 set0) => [[B out] Hout].
-    exists ([set B], out).
-    apply: pt_branch.
+    elim: u => [|a u IH] /=.
     - by rewrite inE.
-    - exact: Hout.
+    - by rewrite !inE IH.
   Qed.
 
-  Theorem singleton_pump_semantic_regular (w0 : word) :
-    { oo : collection * regexp &
-      pump_semantic (String w0) [set set0] oo.1 oo.2 *
-      RegLang.dfa.regular (fun w : word => is_true (w \in oo.2)) }%type.
+  Lemma subset_word_symbols_all (u v : word) :
+    word_symbols u \subset word_symbols v ->
+    all (fun c => c \in v) u.
   Proof.
-    case: (singleton_pump_semantic_exists w0) => [[o out] Hout].
-    exists (o, out); split=> //.
-    exact: pump_semantic_regular Hout.
-  Qed.
-    
-  (* S0* · w0[0] · S1* · w0[1] · ... · S_{n-1}* · w0[n-1] · Sn*  *)
-  Definition pumping_re (w0 : word) : RegLang.regexp.regexp char :=
-    let n := size w0 in
-    let fix build (j : nat) :=
-      match j with
-      | 0 =>
-          RegLang.regexp.Star (re_of_set (sigma w0 0))
-      | j'.+1 =>
-          RegLang.regexp.Conc
-            (build j')
-            (RegLang.regexp.Conc
-               (RegLang.regexp.Atom (nth d0 w0 j'))
-               (RegLang.regexp.Star (re_of_set (sigma w0 j'.+1))))
-      end
-    in build n.
-
-  (* This is the main semantic lemma you need to prove (by an invariant / induction on j). *)
-  Lemma pumping_re_correct (w0 w : word) :
-    @pumping_closure_singleton_dlang char d0 w0 w <-> (w \in pumping_re w0).
-  Proof.
-    (* TODO:
-       Prove “reachable (|w|-|w0|) w0 w” iff w matches the staged decomposition:
-         - before seeing w0[0], only Sj 0 letters can appear (actually Sj 0 is {w0[0]})
-         - between w0[j] and w0[j+1], only Sj j letters can be inserted
-         - after finishing w0, only Sj n letters can be inserted
-       This is exactly what pumping_re encodes. *)
-  Admitted.
-
-  (* Regularity of the decidable singleton closure language *)
-  Theorem pumping_closure_singleton_regular (w0 : word) :
-    RegLang.dfa.regular (fun w => @pumping_closure_singleton_dlang char d0 w0 w).
-  Proof.
-
-    case: (@regularP char
-      (fun w : word => is_true (@pumping_closure_singleton_dlang char d0 w0 w)))
-      => _ Hregular.
-    apply: Hregular.
-    exists (pumping_re w0) => w.
-    exact: pumping_re_correct.
+    move=> Hsub.
+    apply/allP=> c Hc.
+    by rewrite -mem_word_symbols (subsetP Hsub) ?mem_word_symbols.
   Qed.
 
-  (* Regularity of the inductive (Prop) pumping_closure, via regular_ext + singleton_eq *)
-  Theorem pumping_closure_regular (w0 : word) :
-    RegLang.dfa.regular (fun w => @pumping_closure char d0 (pred1 w0) w).
+  Lemma pumping_insert_char_after_prefix (p s : word) c :
+    c \in p ->
+    @pumping char d0 (p ++ s) (p ++ c :: s).
   Proof.
-    apply: (RegLang.dfa.regular_ext (L2 := fun w =>
-      @pumping_closure_singleton_dlang char d0 w0 w)
-      (pumping_closure_singleton_regular w0)).
-    move=> w; exact: (@pumping_closure_singleton_eq char d0 w0 w).
+    move=> Hc.
+    have [i Hi Hnth] : exists2 i, i < size p & nth d0 p i = c.
+    { exists (seq.index c p).
+      - by rewrite index_mem.
+      - by rewrite nth_index. }
+    have Hp : 0 < size p := leq_ltn_trans (leq0n i) Hi.
+    rewrite /pumping.
+    apply/hasP; exists (size p).-1.
+    - rewrite mem_iota add0n size_cat leq0n /=.
+      by rewrite -{2}(prednK Hp) ltnS leq_addr.
+    apply/andP; split.
+    - rewrite size_cat.
+      by rewrite -{2}(prednK Hp) ltnS leq_addr.
+    apply/hasP; exists i.
+    - by rewrite mem_iota add0n prednK.
+    apply/andP; split.
+    - by rewrite -ltnS prednK.
+    apply/eqP.
+    rewrite /pump_at prednK // take_size_cat // drop_size_cat //.
+    by rewrite nth_cat Hi Hnth.
+  Qed.
+
+  Lemma all_mem_catl (p u : word) v :
+    all (fun c => c \in p) v ->
+    all (fun c => c \in p ++ u) v.
+  Proof.
+    move/allP=> Hall.
+    apply/allP=> c Hcin.
+    have Hc := Hall c Hcin.
+    by rewrite mem_cat Hc.
+  Qed.
+
+  Lemma pumping_insert_block_after_prefix (p block s : word) :
+    all (fun c => c \in p) block ->
+    @pumping_closure char d0 (pred1 (p ++ s)) (p ++ block ++ s).
+  Proof.
+    elim: block p s => [|c block IH] p s /=.
+    - move=> _.
+      exact: (@pumping_closure_base char d0 (pred1 (p ++ s)) (p ++ s) (eq_refl _)).
+    - move/andP=> [Hc Hall].
+      have Hstep :
+        @pumping char d0 (p ++ s) (p ++ c :: s) :=
+        pumping_insert_char_after_prefix p s c Hc.
+      have Hfirst :
+        @pumping_closure char d0 (pred1 (p ++ s)) (p ++ c :: s) :=
+        @pumping_closure_step char d0 (pred1 (p ++ s))
+          (p ++ s) (p ++ c :: s)
+          (@pumping_closure_base char d0 (pred1 (p ++ s)) (p ++ s) (eq_refl _))
+          Hstep.
+      have Hrest :
+        @pumping_closure char d0 (pred1 (p ++ c :: s))
+          (p ++ c :: block ++ s).
+      { have := IH (p ++ [:: c]) s (all_mem_catl p [:: c] block Hall).
+        by rewrite -!catA /=. }
+      exact: pumping_closure_lift_closure Hfirst Hrest.
+  Qed.
+
+  Fixpoint factor_basis (p : word) (vv : seq word) : seq word :=
+    if vv is v :: vs then
+      if word_symbols v \subset word_symbols p then factor_basis p vs
+      else v :: factor_basis (p ++ v) vs
+    else [::].
+
+  Lemma factor_basis_replay (p : word) (vv : seq word) :
+    @pumping_closure char d0
+      (pred1 (p ++ flatten (factor_basis p vv)))
+      (p ++ flatten vv).
+  Proof.
+    elim: vv p => [|v vs IH] p /=.
+    - exact: (@pumping_closure_base char d0
+        (pred1 (p ++ [::])) (p ++ [::]) (eq_refl _)).
+    - case Hsub: (word_symbols v \subset word_symbols p).
+      + have Hrec := IH p.
+        have Hall : all (fun c => c \in p) v :=
+          subset_word_symbols_all v p Hsub.
+        have Hins :
+          @pumping_closure char d0 (pred1 (p ++ flatten vs))
+            (p ++ v ++ flatten vs) :=
+          pumping_insert_block_after_prefix p v (flatten vs) Hall.
+        exact: pumping_closure_lift_closure Hrec Hins.
+      + have Hrec := IH (p ++ v).
+        by rewrite -!catA /= in Hrec.
+  Qed.
+
+  Lemma regexp_power_flatten (r : regexp) (vv : seq word) :
+    all (fun v => v \in r) vv ->
+    flatten vv \in regexp_power (size vv) r.
+  Proof.
+    elim: vv => [|v vs IH] //=.
+    move/andP=> [Hv Hvs].
+    apply/concP.
+    exists v; exists (flatten vs); split=> //.
+    by split=> //; exact: IH.
+  Qed.
+
+  Lemma factor_basis_all (r : regexp) p vv :
+    all (fun v => v \in r) vv ->
+    all (fun v => v \in r) (factor_basis p vv).
+  Proof.
+    elim: vv p => [|v vs IH] p //=.
+    move/andP=> [Hv Hvs].
+    case: ifP => _.
+    - exact: IH _ Hvs.
+    - by rewrite /= Hv (IH _ Hvs).
+  Qed.
+
+  Lemma factor_basis_size (p : word) (vv : seq word) :
+    size (factor_basis p vv) + #|word_symbols p| <= #|char|.
+  Proof.
+    elim: vv p => [|v vs IH] p /=.
+    - rewrite add0n. exact: max_card.
+    - case Hsub: (word_symbols v \subset word_symbols p).
+      + exact: IH.
+      + have IH' := IH (p ++ v).
+        rewrite word_symbols_cat in IH'.
+        have Hproper :
+          word_symbols p \proper word_symbols p :|: word_symbols v.
+        { apply: properUl.
+          by rewrite Hsub. }
+        have Hlt : #|word_symbols p| < #|word_symbols p :|: word_symbols v| :=
+          proper_card Hproper.
+        apply: (leq_trans _ IH').
+        by rewrite addSn -addnS leq_add2l.
+  Qed.
+
+  Lemma pumping_closure_bounded_star_basis_to_star (r : regexp) :
+    forall w,
+      @pumping_closure char d0 (regex_lang (bounded_star_basis r)) w ->
+      @pumping_closure char d0 (regex_lang (Star r)) w.
+  Proof.
+    apply: pumping_closure_monotone => w.
+    exact: bounded_star_basis_in_star.
+  Qed.
+
+  (* Keystone compression lemma for the finite-basis theorem:
+     any word in r* can be obtained by pumping from a word made of at most
+     #|char| many r-factors. *)
+  Lemma star_has_bounded_pumping_basis (r : regexp) (w : word) :
+    w \in Star r ->
+    exists u,
+      [/\ u \in bounded_star_basis r
+        & @pumping_closure char d0 (pred1 u) w].
+  Proof.
+    case/starP=> vv Hall ->.
+    pose bs := factor_basis [::] vv.
+    exists (flatten bs); split.
+    - apply/bounded_star_basisP.
+      have Hsize : size bs < (#|char|).+1.
+      { rewrite -ltnS.
+        have := factor_basis_size [::] vv.
+        by rewrite /bs /= cards0 addn0. }
+      exists (Ordinal Hsize).
+      have Hr : all (fun v => v \in r) vv.
+      { apply/allP=> v Hv.
+        move/allP: Hall => /(_ v Hv).
+        by case/andP. }
+      have Hbs : all (fun v => v \in r) bs :=
+        factor_basis_all r [::] vv Hr.
+      have Hpow : flatten bs \in regexp_power (size bs) r :=
+        regexp_power_flatten r bs Hbs.
+      exact: Hpow.
+    - have Hreplay := factor_basis_replay [::] vv.
+      by rewrite /bs in Hreplay.
+  Qed.
+
+  Lemma pumping_closure_star_to_bounded_star_basis (r : regexp) :
+    forall w,
+      @pumping_closure char d0 (regex_lang (Star r)) w ->
+      @pumping_closure char d0 (regex_lang (bounded_star_basis r)) w.
+  Proof.
+    move=> w Hclos.
+    elim: Hclos => [u Hu | u v _ IH Hpump].
+    - case: (star_has_bounded_pumping_basis r u Hu) => x [Hx Hxu].
+      exact: pumping_closure_lift_singleton Hx Hxu.
+    - exact: pumping_closure_step IH Hpump.
+  Qed.
+
+  Theorem pumping_closure_star_finite_basis (r : regexp) :
+    closure_equiv (Star r) (bounded_star_basis r).
+  Proof.
+    move=> w; split.
+    - exact: pumping_closure_star_to_bounded_star_basis.
+    - exact: pumping_closure_bounded_star_basis_to_star.
   Qed.
 
 End PumpingClosureRegularity.

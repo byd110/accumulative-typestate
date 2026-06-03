@@ -284,6 +284,117 @@ Section PumpingClosureRegularity.
     - by exists k.
   Qed.
 
+  Definition concat_word_lists (xs ys : seq word) : seq word :=
+    flatten [seq [seq x ++ y | y <- ys] | x <- xs].
+
+  Lemma concat_word_listsP xs ys w :
+    reflect
+      (exists x y, [/\ x \in xs, y \in ys & w = x ++ y])
+      (w \in concat_word_lists xs ys).
+  Proof.
+    rewrite /concat_word_lists.
+    apply: (iffP flattenP).
+    - move=> [zs /mapP [x Hx ->] /mapP [y Hy ->]].
+      by exists x, y; split.
+    - move=> [x [y [Hx Hy ->]]].
+      exists [seq x ++ y | y <- ys].
+      + by apply/mapP; exists x.
+      + by apply/mapP; exists y.
+  Qed.
+
+  Fixpoint star_free (r : regexp) : bool :=
+    match r with
+    | Void => true
+    | Eps => true
+    | Atom _ => true
+    | Star _ => false
+    | Plus r1 r2 => star_free r1 && star_free r2
+    | Conc r1 r2 => star_free r1 && star_free r2
+    end.
+
+  Fixpoint words_of_star_free (r : regexp) : seq word :=
+    match r with
+    | Void => [::]
+    | Eps => [:: [::]]
+    | Atom a => [:: [:: a]]
+    | Star _ => [::]
+    | Plus r1 r2 => words_of_star_free r1 ++ words_of_star_free r2
+    | Conc r1 r2 =>
+        concat_word_lists (words_of_star_free r1) (words_of_star_free r2)
+    end.
+
+  Definition union_strings (ws : seq word) : regexp :=
+    \big[@Plus char / @Void char]_(w <- ws)
+      (String w).
+
+  Lemma union_stringsP ws w :
+    reflect (exists2 u, u \in ws & w = u) (w \in union_strings ws).
+  Proof.
+    rewrite /union_strings.
+    apply: (iffP (big_plus_seqP _ _ _)) => [[u Hu]|[u Hu ->]].
+    - by rewrite StringE inE => /eqP ->; exists u.
+    - exists u => //.
+      by rewrite StringE inE eq_refl.
+  Qed.
+
+  Lemma union_strings_correct ws w :
+    (w \in union_strings ws) = (w \in ws).
+  Proof.
+    apply/idP/idP.
+    - by case/union_stringsP=> u Hu ->.
+    - move=> Hw. apply/union_stringsP. by exists w.
+  Qed.
+
+  Lemma words_of_star_free_correct r :
+    star_free r ->
+    forall w, (w \in r) = (w \in words_of_star_free r).
+  Proof.
+    elim: r => [| |a|r _|r1 IH1 r2 IH2|r1 IH1 r2 IH2] /=.
+    - by move=> _ w; rewrite unfold_in /void.
+    - by move=> _ [|x xs]; rewrite unfold_in /eps.
+    - move=> _ w. rewrite unfold_in /atom.
+      by case: w => [|x [|y ys]]; rewrite ?inE.
+    - by case.
+    - move/andP=> [Hr1 Hr2] w.
+      by rewrite unfold_in /= !inE IH1 // IH2 // mem_cat.
+    - move/andP=> [Hr1 Hr2] w.
+      rewrite unfold_in /=.
+      apply/idP/idP.
+      + case/concP=> x [y [-> [Hx Hy]]].
+        apply/concat_word_listsP.
+        exists x, y; split=> //.
+        * by rewrite -IH1.
+        * by rewrite -IH2.
+      + case/concat_word_listsP=> x [y [Hx Hy ->]].
+        apply/concP; exists x; exists y; split=> //.
+        split.
+        * by rewrite IH1.
+        * by rewrite IH2.
+  Qed.
+
+  Definition normalize_star_free (r : regexp) : regexp :=
+    union_strings (words_of_star_free r).
+
+  Lemma normalize_star_free_correct r :
+    star_free r ->
+    forall w, (w \in normalize_star_free r) = (w \in r).
+  Proof.
+    move=> Hr w.
+    by rewrite /normalize_star_free union_strings_correct
+      -words_of_star_free_correct.
+  Qed.
+
+  Definition finite_lang (L : dlang) :=
+    exists ws : seq word, forall w, L w <-> w \in ws.
+
+  Lemma star_free_finite (r : regexp) :
+    star_free r -> finite_lang (regex_lang r).
+  Proof.
+    move=> Hr.
+    exists (words_of_star_free r) => w.
+    by rewrite /regex_lang inE words_of_star_free_correct.
+  Qed.
+
   Lemma pumping_closure_monotone (L1 L2 : dlang) :
     {subset L1 <= L2} ->
     forall w,

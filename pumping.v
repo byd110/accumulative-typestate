@@ -354,9 +354,9 @@ Section PumpingClosureRegularity.
     - by move=> _ [|x xs]; rewrite unfold_in /eps.
     - move=> _ w. rewrite unfold_in /atom.
       by case: w => [|x [|y ys]]; rewrite ?inE.
-    - by case.
+    - move=> H. by case: H.
     - move/andP=> [Hr1 Hr2] w.
-      by rewrite unfold_in /= !inE IH1 // IH2 // mem_cat.
+      by rewrite unfold_in /= /plus /= IH1 // IH2 // mem_cat.
     - move/andP=> [Hr1 Hr2] w.
       rewrite unfold_in /=.
       apply/idP/idP.

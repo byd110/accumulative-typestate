@@ -395,6 +395,81 @@ Section PumpingClosureRegularity.
     by rewrite /regex_lang inE words_of_star_free_correct.
   Qed.
 
+  Fixpoint eliminate_star (r : regexp) : regexp :=
+    match r with
+    | Void => Void
+    | Eps => Eps
+    | Atom a => Atom a
+    | Star r1 => bounded_star_basis (eliminate_star r1)
+    | Plus r1 r2 => Plus (eliminate_star r1) (eliminate_star r2)
+    | Conc r1 r2 => Conc (eliminate_star r1) (eliminate_star r2)
+    end.
+
+  Lemma regexp_power_star_free n r :
+    star_free r -> star_free (regexp_power n r).
+  Proof.
+    elim: n => [|n IH] //= Hr.
+    by rewrite Hr IH.
+  Qed.
+
+  Lemma bounded_star_basis_star_free r :
+    star_free r -> star_free (bounded_star_basis r).
+  Proof.
+    move=> Hr.
+    rewrite /bounded_star_basis.
+    elim: (index_enum ('I_(#|char|).+1)) => [|k ks IH].
+    - by rewrite big_nil.
+    - by rewrite big_cons /= regexp_power_star_free // IH.
+  Qed.
+
+  Lemma eliminate_star_star_free r :
+    star_free (eliminate_star r).
+  Proof.
+    elim: r => [| |a|r IH|r1 IH1 r2 IH2|r1 IH1 r2 IH2] //=.
+    - exact: bounded_star_basis_star_free.
+    - by rewrite IH1 IH2.
+    - by rewrite IH1 IH2.
+  Qed.
+
+  Definition pumping_normalize (r : regexp) : regexp :=
+    normalize_star_free (eliminate_star r).
+
+  Lemma pumping_normalize_is_union_strings r :
+    pumping_normalize r = union_strings (words_of_star_free (eliminate_star r)).
+  Proof. by []. Qed.
+
+  Lemma closure_equiv_refl r :
+    closure_equiv r r.
+  Proof. by move=> w. Qed.
+
+  Lemma closure_equiv_sym r s :
+    closure_equiv r s -> closure_equiv s r.
+  Proof.
+    move=> H w. split; by move/(H w).
+  Qed.
+
+  Lemma closure_equiv_trans r s t :
+    closure_equiv r s -> closure_equiv s t -> closure_equiv r t.
+  Proof.
+    move=> Hrs Hst w. split.
+    - by move/(Hrs w)/(Hst w).
+    - by move/(Hst w)/(Hrs w).
+  Qed.
+
+  Lemma regexp_language_regular (r : regexp) :
+    RegLang.dfa.regular (fun w : word => is_true (w \in r)).
+  Proof.
+    case: (@regularP char (fun w : word => is_true (w \in r)))
+      => _ Hregular.
+    apply: Hregular.
+    by exists r.
+  Qed.
+
+  Lemma pumping_normalize_regular r :
+    RegLang.dfa.regular
+      (fun w : word => is_true (w \in pumping_normalize r)).
+  Proof. exact: regexp_language_regular. Qed.
+
   Lemma pumping_closure_monotone (L1 L2 : dlang) :
     {subset L1 <= L2} ->
     forall w,
@@ -405,6 +480,24 @@ Section PumpingClosureRegularity.
     elim: Hclos => [u Hu | u v _ IH Hpump].
     - exact: pumping_closure_base (Hsub _ Hu).
     - exact: pumping_closure_step IH Hpump.
+  Qed.
+
+  Lemma language_equiv_closure_equiv r s :
+    (forall w, (w \in r) = (w \in s)) ->
+    closure_equiv r s.
+  Proof.
+    move=> Hlang w; split.
+    - apply: pumping_closure_monotone => u.
+      by rewrite /regex_lang !inE Hlang.
+    - apply: pumping_closure_monotone => u.
+      by rewrite /regex_lang !inE Hlang.
+  Qed.
+
+  Lemma pumping_normalize_eliminate_star_equiv r :
+    closure_equiv (eliminate_star r) (pumping_normalize r).
+  Proof.
+    apply: language_equiv_closure_equiv => w.
+    by rewrite normalize_star_free_correct ?eliminate_star_star_free.
   Qed.
 
   Lemma pumping_closure_lift_singleton (L : dlang) (u w : word) :
@@ -427,6 +520,149 @@ Section PumpingClosureRegularity.
     elim: Hclos => [v Hv | v v' _ IH Hpump].
     - move/eqP: Hv => ->. exact: Hu.
     - exact: pumping_closure_step IH Hpump.
+  Qed.
+
+  Lemma pump_at_cat_suffix (u v : word) k i :
+    k < size u ->
+    i <= k ->
+    @pump_at char d0 (u ++ v) k i = @pump_at char d0 u k i ++ v.
+  Proof.
+    move=> Hk Hi.
+    have Hk' : k.+1 <= size u by exact: Hk.
+    have Hi' : i < size u := leq_ltn_trans Hi Hk.
+    rewrite /pump_at.
+    rewrite takel_cat // nth_cat Hi'.
+    case Hlt: (k.+1 < size u).
+    - by rewrite drop_cat Hlt -catA.
+    - have Heq : k.+1 = size u.
+      { apply/eqP. by rewrite eqn_leq Hk' leqNgt Hlt. }
+      by rewrite Heq drop_size_cat // take_size drop_size -catA.
+  Qed.
+
+  Lemma pumping_cat_suffix (u u' v : word) :
+    @pumping char d0 u u' ->
+    @pumping char d0 (u ++ v) (u' ++ v).
+  Proof.
+    rewrite /pumping.
+    move/hasP=> [k Hk].
+    move/andP=> [Hklt Hki].
+    move/hasP: Hki=> [i Hi].
+    move/andP=> [Hile /eqP ->].
+    have Hkcat : k < size (u ++ v).
+    { by rewrite size_cat; exact: leq_trans Hklt (leq_addr _ _). }
+    apply/hasP; exists k.
+    - by rewrite mem_iota add0n leq0n Hkcat.
+    apply/andP; split.
+    - exact: Hkcat.
+    apply/hasP; exists i.
+    - by rewrite mem_iota add0n leq0n ltnS Hile.
+    apply/andP; split=> //.
+    by rewrite pump_at_cat_suffix // eq_refl.
+  Qed.
+
+  Lemma pump_at_cat_prefix (p u : word) k i :
+    k < size u ->
+    i <= k ->
+    @pump_at char d0 (p ++ u) (size p + k) (size p + i) =
+      p ++ @pump_at char d0 u k i.
+  Proof.
+    move=> Hk Hi.
+    have Hk' : k.+1 <= size u by exact: Hk.
+    rewrite /pump_at.
+    rewrite -addnS take_cat ltnNge leq_addr /=.
+    rewrite -{2}[size p]addn0 subnDl subn0.
+    rewrite drop_cat ltnNge leq_addr /=.
+    rewrite -[X in _ - X]addn0 subnDl subn0.
+    rewrite nth_cat ltnNge leq_addr /=.
+    rewrite -[X in _ - X]addn0 subnDl subn0.
+    by rewrite -!catA.
+  Qed.
+
+  Lemma pumping_cat_prefix (p u u' : word) :
+    @pumping char d0 u u' ->
+    @pumping char d0 (p ++ u) (p ++ u').
+  Proof.
+    rewrite /pumping.
+    move/hasP=> [k Hk].
+    move/andP=> [Hklt Hki].
+    move/hasP: Hki=> [i Hi].
+    move/andP=> [Hile /eqP ->].
+    apply/hasP; exists (size p + k).
+    - rewrite mem_iota add0n size_cat.
+      by rewrite leq_addr ltn_add2l.
+    apply/andP; split.
+    - by rewrite size_cat ltn_add2l.
+    apply/hasP; exists (size p + i).
+    - rewrite mem_iota add0n.
+      by rewrite leq_addr ltnS leq_add2l Hile.
+    apply/andP; split.
+    - by rewrite leq_add2l.
+    by rewrite pump_at_cat_prefix // eq_refl.
+  Qed.
+
+  Lemma pumping_closure_cat_prefix
+      (L1 L2 : dlang) (u v : word) :
+    L1 u ->
+    @pumping_closure char d0 L2 v ->
+    @pumping_closure char d0 (RegLang.languages.conc L1 L2) (u ++ v).
+  Proof.
+    move=> Hu Hclos.
+    elim: Hclos => [v0 Hv0 | v0 v1 _ IH Hpump].
+    - apply: pumping_closure_base.
+      exact: conc_cat Hu Hv0.
+    - apply: (@pumping_closure_step char d0 (RegLang.languages.conc L1 L2)
+                (u ++ v0) (u ++ v1) IH).
+      exact: pumping_cat_prefix.
+  Qed.
+
+  Lemma pumping_closure_cat
+      (L1 L2 : dlang) (u v : word) :
+    @pumping_closure char d0 L1 u ->
+    @pumping_closure char d0 L2 v ->
+    @pumping_closure char d0 (RegLang.languages.conc L1 L2) (u ++ v).
+  Proof.
+    move=> Hu Hv.
+    elim: Hu => [u0 Hu0 | u0 u1 _ IH Hpump].
+    - exact: pumping_closure_cat_prefix Hu0 Hv.
+    - apply: (@pumping_closure_step char d0 (RegLang.languages.conc L1 L2)
+                (u0 ++ v) (u1 ++ v) IH).
+      exact: pumping_cat_suffix.
+  Qed.
+
+  Lemma pumping_closure_base_lift (L1 L2 : dlang) :
+    (forall u, L1 u -> @pumping_closure char d0 L2 u) ->
+    forall w,
+      @pumping_closure char d0 L1 w ->
+      @pumping_closure char d0 L2 w.
+  Proof.
+    move=> Hbase w Hclos.
+    elim: Hclos => [u Hu | u v _ IH Hpump].
+    - exact: Hbase.
+    - exact: pumping_closure_step IH Hpump.
+  Qed.
+
+  Lemma pumping_closure_plusl (r s : regexp) w :
+    @pumping_closure char d0 (regex_lang r) w ->
+    @pumping_closure char d0 (regex_lang (Plus r s)) w.
+  Proof.
+    apply: pumping_closure_monotone => u Hu.
+    by apply/plusP; left.
+  Qed.
+
+  Lemma pumping_closure_plusr (r s : regexp) w :
+    @pumping_closure char d0 (regex_lang s) w ->
+    @pumping_closure char d0 (regex_lang (Plus r s)) w.
+  Proof.
+    apply: pumping_closure_monotone => u Hu.
+    by apply/plusP; right.
+  Qed.
+
+  Lemma pumping_closure_conc_regex (r s : regexp) u v :
+    @pumping_closure char d0 (regex_lang r) u ->
+    @pumping_closure char d0 (regex_lang s) v ->
+    @pumping_closure char d0 (regex_lang (Conc r s)) (u ++ v).
+  Proof.
+    exact: pumping_closure_cat.
   Qed.
 
   Lemma regexp_power_in_star (r : regexp) n (w : word) :
@@ -660,6 +896,102 @@ Section PumpingClosureRegularity.
     move=> w; split.
     - exact: pumping_closure_star_to_bounded_star_basis.
     - exact: pumping_closure_bounded_star_basis_to_star.
+  Qed.
+
+  Lemma pumping_closure_star_factors (r : regexp) (vv : seq word) :
+    (forall v, v \in vv ->
+      @pumping_closure char d0 (regex_lang r) v) ->
+    @pumping_closure char d0 (regex_lang (Star r)) (flatten vv).
+  Proof.
+    elim: vv => [|v vs IH] Hfac /=.
+    - apply: pumping_closure_base.
+      by rewrite /regex_lang inE.
+    - have Hv : @pumping_closure char d0 (regex_lang r) v.
+      { exact: Hfac v (mem_head _ _). }
+      have Hvs : @pumping_closure char d0 (regex_lang (Star r)) (flatten vs).
+      { apply: IH => u Hu. apply: Hfac. by rewrite in_cons Hu orbT. }
+      have Hcat :=
+        @pumping_closure_conc_regex r (Star r) v (flatten vs) Hv Hvs.
+      apply: (pumping_closure_monotone _ _ _ _ Hcat) => u.
+      case/concP=> u1 [u2 [-> [Hu1 Hu2]]].
+      exact: star_cat Hu1 Hu2.
+  Qed.
+
+  Lemma eliminate_star_base_closure r :
+    [/\ (forall w,
+          w \in r ->
+          @pumping_closure char d0 (regex_lang (eliminate_star r)) w)
+      & (forall w,
+          w \in eliminate_star r ->
+          @pumping_closure char d0 (regex_lang r) w)].
+  Proof.
+    elim: r => [| |a|r [IHto IHfrom]|r1 [IHto1 IHfrom1] r2 [IHto2 IHfrom2]
+                |r1 [IHto1 IHfrom1] r2 [IHto2 IHfrom2]] /=.
+    - split; move=> w; by rewrite /regex_lang inE.
+    - split; move=> w Hw; exact: pumping_closure_base Hw.
+    - split; move=> w Hw; exact: pumping_closure_base Hw.
+    - split.
+      + move=> w Hw.
+        case/starP: Hw => vv Hall ->.
+        have Hstar :
+          @pumping_closure char d0 (regex_lang (Star (eliminate_star r)))
+            (flatten vv).
+        { apply: pumping_closure_star_factors => v Hv.
+          have Hrv : v \in r.
+          { move: ((allP Hall) v Hv). by rewrite inE => /andP []. }
+          exact: (IHto v Hrv). }
+        exact: pumping_closure_star_to_bounded_star_basis Hstar.
+      + move=> w Hw.
+        have Hstar_elim :
+          @pumping_closure char d0 (regex_lang (Star (eliminate_star r))) w :=
+          pumping_closure_bounded_star_basis_to_star (eliminate_star r) w
+            (@pumping_closure_base char d0
+              (regex_lang (bounded_star_basis (eliminate_star r))) w Hw).
+        apply: (@pumping_closure_base_lift
+          (regex_lang (Star (eliminate_star r))) (regex_lang (Star r))).
+        * move=> u Hu.
+          case/starP: Hu => vv Hall ->.
+          apply: pumping_closure_star_factors => v Hv.
+          have Hrv : v \in eliminate_star r.
+          { move: ((allP Hall) v Hv). by rewrite inE => /andP []. }
+          exact: (IHfrom v Hrv).
+        * exact: Hstar_elim.
+    - split.
+      + move=> w.
+        case/plusP=> [Hw | Hw].
+        * exact: pumping_closure_plusl (IHto1 w Hw).
+        * exact: pumping_closure_plusr (IHto2 w Hw).
+      + move=> w.
+        case/plusP=> [Hw | Hw].
+        * exact: pumping_closure_plusl (IHfrom1 w Hw).
+        * exact: pumping_closure_plusr (IHfrom2 w Hw).
+    - split.
+      + move=> w.
+        case/concP=> u [v [-> [Hu Hv]]].
+        exact: pumping_closure_conc_regex (IHto1 u Hu) (IHto2 v Hv).
+      + move=> w.
+        case/concP=> u [v [-> [Hu Hv]]].
+        exact: pumping_closure_conc_regex (IHfrom1 u Hu) (IHfrom2 v Hv).
+  Qed.
+
+  Theorem eliminate_star_correct r :
+    closure_equiv r (eliminate_star r).
+  Proof.
+    have [Hto Hfrom] := eliminate_star_base_closure r.
+    move=> w; split.
+    - move=> Hclos.
+      exact: (@pumping_closure_base_lift
+        (regex_lang r) (regex_lang (eliminate_star r)) Hto w Hclos).
+    - move=> Hclos.
+      exact: (@pumping_closure_base_lift
+        (regex_lang (eliminate_star r)) (regex_lang r) Hfrom w Hclos).
+  Qed.
+
+  Theorem pumping_normalize_correct r :
+    closure_equiv r (pumping_normalize r).
+  Proof.
+    exact: closure_equiv_trans (eliminate_star_correct r)
+             (pumping_normalize_eliminate_star_equiv r).
   Qed.
 
 End PumpingClosureRegularity.

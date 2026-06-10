@@ -1328,4 +1328,80 @@ Section PumpingClosureRegularity.
              (pumping_normalize_eliminate_star_equiv r).
   Qed.
 
+  Lemma pumping_closure_singleton_correct w out :
+    @pumping_closure char d0 (pred1 w) out <->
+    out \in pumping_singleton_re w.
+  Proof.
+    split.
+    - exact: pumping_closure_singleton_to_re.
+    - move=> Hre.
+      apply: pump_semantic_to_closure.
+      exact: (proj2 (pump_semanticP set0 w out) Hre).
+  Qed.
+
+  Lemma pumping_closure_singleton_regular w :
+    RegLang.dfa.regular
+      (fun out : word => @pumping_closure char d0 (pred1 w) out).
+  Proof.
+    apply: (RegLang.dfa.regular_ext
+      (L2 := fun out : word => is_true (out \in pumping_singleton_re w))).
+    - exact: regexp_language_regular.
+    - move=> out. exact: pumping_closure_singleton_correct.
+  Qed.
+
+  Lemma pumping_closure_union_stringsP ws out :
+    @pumping_closure char d0 (regex_lang (union_strings ws)) out <->
+    exists2 w, w \in ws & @pumping_closure char d0 (pred1 w) out.
+  Proof.
+    split.
+    - move=> Hclos.
+      elim: Hclos => [u Hu | u v _ [w Hw Hwu] Hpump].
+      + move: Hu. rewrite /regex_lang inE union_strings_correct => Hu.
+        exists u => //.
+        exact: (@pumping_closure_base char d0 (pred1 u) u (eq_refl _)).
+      + exists w => //.
+        exact: pumping_closure_step Hwu Hpump.
+    - move=> [w Hw Hclos].
+      apply: (@pumping_closure_lift_singleton
+        (regex_lang (union_strings ws)) w out).
+      + by rewrite /regex_lang inE union_strings_correct.
+      + exact: Hclos.
+  Qed.
+
+  Lemma pumping_closure_union_strings_regular ws :
+    RegLang.dfa.regular
+      (fun out : word =>
+        @pumping_closure char d0 (regex_lang (union_strings ws)) out).
+  Proof.
+    apply: (RegLang.dfa.regular_ext
+      (L2 := fun out : word =>
+        exists2 w, w \in ws & @pumping_closure char d0 (pred1 w) out)).
+    - apply: RegLang.dfa.regular_bigU => w _.
+      exact: pumping_closure_singleton_regular.
+    - move=> out. exact: pumping_closure_union_stringsP.
+  Qed.
+
+  Lemma pumping_closure_normalized_regular r :
+    RegLang.dfa.regular
+      (fun out : word =>
+        @pumping_closure char d0 (regex_lang (pumping_normalize r)) out).
+  Proof.
+    rewrite pumping_normalize_is_union_strings.
+    exact: pumping_closure_union_strings_regular.
+  Qed.
+
+  Theorem pumping_closure_regular_regex r :
+    RegLang.dfa.regular
+      (fun out : word =>
+        @pumping_closure char d0 (regex_lang r) out).
+  Proof.
+    apply: (RegLang.dfa.regular_ext
+      (L2 := fun out : word =>
+        @pumping_closure char d0 (regex_lang (pumping_normalize r)) out)).
+    - exact: pumping_closure_normalized_regular.
+    - move=> out.
+      case: (pumping_normalize_correct r out) => Hto Hfrom.
+      split; [exact: Hto | exact: Hfrom].
+  Qed.
+
 End PumpingClosureRegularity.

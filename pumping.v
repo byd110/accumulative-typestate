@@ -1417,4 +1417,46 @@ Section InterleavingClosedness.
   Notation regexp := (RegLang.regexp.regexp char).
   Variable d0 : char.
 
+  Inductive interleaving : word -> word -> word -> Prop :=
+  | interleaving_nil_l v :
+      interleaving [::] v v
+  | interleaving_nil_r u :
+      interleaving u [::] u
+  | interleaving_left a u v w :
+      interleaving u v w ->
+      interleaving (a :: u) v (a :: w)
+  | interleaving_right b u v w :
+      interleaving u v w ->
+      interleaving u (b :: v) (b :: w).
+
+  Variables a b x y : char.
+
+  Example interleaving_ab_xy_axby :
+    interleaving [:: a; b] [:: x; y] [:: a; x; b; y].
+  Proof.
+    apply: interleaving_left.
+    apply: interleaving_right.
+    apply: interleaving_left.
+    apply: interleaving_right.
+    exact: interleaving_nil_l.
+  Qed.
+
+  Example interleaving_ab_xy_xaby :
+    interleaving [:: a; b] [:: x; y] [:: x; a; b; y].
+  Proof.
+    apply: interleaving_right.
+    apply: interleaving_left.
+    apply: interleaving_left.
+    apply: interleaving_right.
+    exact: interleaving_nil_l.
+  Qed.
+
+  Example interleaving_left_empty :
+    interleaving [::] [:: x; y] [:: x; y].
+  Proof. exact: interleaving_nil_l. Qed.
+
+  Example interleaving_right_empty :
+    interleaving [:: a; b] [::] [:: a; b].
+  Proof. exact: interleaving_nil_r. Qed.
+
 End InterleavingClosedness.

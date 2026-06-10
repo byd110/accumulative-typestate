@@ -258,6 +258,24 @@ Section PumpingClosureRegularity.
     \big[@Plus char / @Void char]_(c in X)
       (Atom c).
 
+  Inductive pump_semantic : {set char} -> word -> word -> Prop :=
+  | pump_semantic_nil X :
+      pump_semantic X [::] [::]
+  | pump_semantic_cons X a s block out :
+      all (fun c => c \in X :|: [set a]) block ->
+      pump_semantic (X :|: [set a]) s out ->
+      pump_semantic X (a :: s) (a :: block ++ out).
+
+  Fixpoint pumping_singleton_re_from (X : {set char}) (w : word) : regexp :=
+    if w is a :: s then
+      Conc (Atom a)
+        (Conc (Star (re_of_set (X :|: [set a])))
+          (pumping_singleton_re_from (X :|: [set a]) s))
+    else Eps.
+
+  Definition pumping_singleton_re (w : word) : regexp :=
+    pumping_singleton_re_from set0 w.
+
   Definition regex_lang (r : regexp) : dlang :=
     [pred w | w \in r].
 
@@ -700,6 +718,276 @@ Section PumpingClosureRegularity.
     - by rewrite !inE IH.
   Qed.
 
+  Lemma re_of_setP (X : {set char}) (w : word) :
+    reflect (exists2 c, c \in X & w = [:: c]) (w \in re_of_set X).
+  Proof.
+    rewrite /re_of_set.
+    apply: (iffP (big_plusP _ _ _)) => [[c Hc Hw] | [c Hc ->]].
+    - move: Hw. rewrite unfold_in /atom.
+      by case: w => [|x [|y ys]] //= /eqP ->; exists c.
+    - exists c => //.
+      change ([:: c] \in atom c).
+      by rewrite /atom inE.
+  Qed.
+
+  Lemma star_re_of_set_all (X : {set char}) (w : word) :
+    w \in Star (re_of_set X) ->
+    all (fun c => c \in X) w.
+  Proof.
+    case/starP=> vv Hall ->.
+    elim: vv Hall => [|v vs IH] //= /andP [Hv Hvs].
+    move: Hv; rewrite inE => /andP [_ Hv].
+    have [c Hc Hatom] : exists2 c, c \in X & v \in Atom c.
+    { rewrite /re_of_set in Hv.
+      pose R := @big_plusP char char (fun c => c \in X) v
+        (fun c => Atom c).
+      exact ((@elimT _ _ R) Hv). }
+    move: Hatom. rewrite unfold_in /atom => /eqP ->.
+    by rewrite /= Hc (IH Hvs).
+  Qed.
+
+  Lemma all_star_re_of_set (X : {set char}) (w : word) :
+    all (fun c => c \in X) w ->
+    w \in Star (re_of_set X).
+  Proof.
+    elim: w => [|a w IH] /=.
+    - by rewrite unfold_in /eps.
+    - case Ha: (a \in X) => //= Hw.
+      have Hhead : [:: a] \in re_of_set X.
+      { apply/re_of_setP. by exists a. }
+      exact: star_cat Hhead (IH Hw).
+  Qed.
+
+  Lemma pump_semanticP X s out :
+    pump_semantic X s out <-> out \in pumping_singleton_re_from X s.
+  Proof.
+    split.
+    - elim=> [Y|Y a rest block out' Hblock _ IH] /=.
+      + by rewrite unfold_in /eps.
+      + apply/concP; exists [:: a]; exists (block ++ out'); split=> //.
+        split.
+        * change ([:: a] \in atom a). by rewrite /atom inE.
+        * apply/concP; exists block; exists out'; split=> //.
+          split.
+          -- exact: all_star_re_of_set.
+          -- exact: IH.
+    - elim: s X out => [|a rest IH] X out /=.
+      + move=> Hout.
+        move: Hout; rewrite unfold_in /eps => /eqP ->.
+        exact: pump_semantic_nil.
+      + case/concP=> h [tail [-> [Hh Htail]]].
+        move: Hh; rewrite unfold_in /atom => /eqP ->.
+        case/concP: Htail => block [out' [-> [Hblock Hout']]].
+        apply: pump_semantic_cons.
+        * exact: star_re_of_set_all.
+        * exact: IH.
+  Qed.
+
+  Lemma pump_semantic_base X s :
+    pump_semantic X s s.
+  Proof.
+    elim: s X => [|a s IH] X /=.
+    - exact: pump_semantic_nil.
+    - exact: pump_semantic_cons (isT : all _ [::]) (IH (X :|: [set a])).
+  Qed.
+
+  Definition insert_after (w : word) k c : word :=
+    take k.+1 w ++ c :: drop k.+1 w.
+
+  Lemma all_take P (w : word) n :
+    all P w -> all P (take n w).
+  Proof.
+    move/allP=> Hall.
+    apply/allP=> c Hc.
+    exact: Hall c (mem_take Hc).
+  Qed.
+
+  Lemma all_drop P (w : word) n :
+    all P w -> all P (drop n w).
+  Proof.
+    move/allP=> Hall.
+    apply/allP=> c Hc.
+    exact: Hall c (mem_drop Hc).
+  Qed.
+
+  Lemma all_insert_after P (w : word) k c :
+    all P w -> P c -> all P (insert_after w k c).
+  Proof.
+    move=> Hw Hc.
+    rewrite /insert_after all_cat /= Hc.
+    by rewrite all_take // all_drop.
+  Qed.
+
+  Lemma cat_cons_cat (x : char) (u v w : word) :
+    u ++ x :: v ++ w = (u ++ x :: v) ++ w.
+  Proof. by elim: u => [|a u IH] //=; rewrite IH. Qed.
+
+  Lemma cons_cat_snoc (a c : char) (block out : word) :
+    a :: block ++ c :: out = a :: (block ++ [:: c]) ++ out.
+  Proof. by elim: block a => [|b block IH] a //=; rewrite IH. Qed.
+
+  Lemma insert_after_cat_prefix (p u : word) k c :
+    insert_after (p ++ u) (size p + k) c =
+      p ++ insert_after u k c.
+  Proof.
+    rewrite /insert_after -addnS.
+    rewrite take_cat ltnNge leq_addr /=.
+    rewrite -{2}[size p]addn0 subnDl subn0.
+    rewrite drop_cat ltnNge leq_addr /=.
+    rewrite -[X in _ - X]addn0 subnDl subn0.
+    by rewrite -!catA.
+  Qed.
+
+  Lemma mem_head_segment_allowed (X : {set char}) (a : char) (block : word) (c : char) :
+    c \in a :: block ->
+    all (fun x => x \in X :|: [set a]) block ->
+    c \in X :|: [set a].
+  Proof.
+    rewrite in_cons.
+    case/orP=> [/eqP -> | Hc] Hblock.
+    - exact: set1Ur.
+    - exact: (allP Hblock c Hc).
+  Qed.
+
+  Lemma pump_semantic_insert_at X s out k c :
+    pump_semantic X s out ->
+    k < size out ->
+    (c \in X) || (c \in take k.+1 out) ->
+    pump_semantic X s (insert_after out k c).
+  Proof.
+    move=> Hsem.
+    elim: Hsem k c => [Y|Y a rest block out' Hblock Hout IH] k c Hk Hc /=.
+    - by rewrite ltn0 in Hk.
+    - set head := a :: block.
+      case Hhead: (k < size head).
+      + have Hc_allowed : c \in Y :|: [set a].
+        { move/orP: Hc => [HcY | Hctake].
+          - by rewrite inE HcY.
+          - have Htake_head :
+              take k.+1 (head ++ out') = take k.+1 head.
+            { exact: takel_cat. }
+            rewrite /head in Htake_head.
+            have Hcin_take_head : c \in take k.+1 head.
+            { by move: Hctake; rewrite Htake_head. }
+            have Hcin_head : c \in head.
+            { exact: mem_take Hcin_take_head. }
+            exact: mem_head_segment_allowed Hcin_head Hblock. }
+        have Hhead_nonempty : head = a :: block by [].
+        rewrite /insert_after.
+        case: k Hhead Hk Hc Hc_allowed => [|k] Hhead Hk Hc Hc_allowed.
+        * rewrite /= take0 drop0.
+          apply: (@pump_semantic_cons Y a rest (c :: block) out').
+          -- by rewrite /= Hc_allowed Hblock.
+          -- exact: Hout.
+        * rewrite /=.
+          have Hkblock : k < size block by move: Hhead; rewrite /head /= ltnS.
+          case Hlt: (k.+1 < size block).
+          -- rewrite (take_cat k.+1 block out') Hlt.
+             rewrite (drop_cat k.+1 block out') Hlt.
+             rewrite cat_cons_cat.
+             apply: (@pump_semantic_cons Y a rest
+               (take k.+1 block ++ c :: drop k.+1 block) out').
+             ++ exact: (all_insert_after
+                  (fun x => x \in Y :|: [set a]) block k c Hblock Hc_allowed).
+             ++ exact: Hout.
+          -- have Hle : k.+1 <= size block by exact: Hkblock.
+             have Heq : k.+1 = size block.
+             { apply/eqP. by rewrite eqn_leq Hle leqNgt Hlt. }
+             rewrite Heq take_size_cat // drop_size_cat //.
+             replace (a :: block ++ c :: out')
+                with (a :: (block ++ [:: c]) ++ out').
+             2: symmetry; exact: (cons_cat_snoc a c block out').
+             apply: (@pump_semantic_cons Y a rest (block ++ [:: c]) out').
+             ++ by rewrite all_cat Hblock /= Hc_allowed.
+             ++ exact: Hout.
+      + have Hhead_le : size head <= k by rewrite leqNgt Hhead.
+        pose kt := k - size head.
+        have HkE : k = size head + kt by rewrite /kt subnKC.
+        have Hkt : kt < size out'.
+        { have Hsize : size (a :: block ++ out') = size head + size out'.
+          { by rewrite /head /= size_cat. }
+          move: Hk. rewrite HkE Hsize ltn_add2l. by []. }
+        have Hc_tail :
+          (c \in Y :|: [set a]) || (c \in take kt.+1 out').
+        { move/orP: Hc => [HcY | Hctake].
+          - apply/orP; left. by rewrite inE HcY.
+          - have Htake_tail :
+              take k.+1 (a :: block ++ out') = head ++ take kt.+1 out'.
+            { change (take k.+1 (head ++ out') = head ++ take kt.+1 out').
+              rewrite HkE -addnS.
+              rewrite take_cat ltnNge leq_addr /=.
+              by rewrite -[X in _ - X]addn0 subnDl subn0. }
+            rewrite Htake_tail in Hctake.
+            move: Hctake; rewrite mem_cat.
+            case/orP=> [Hcin_head | Hctail].
+            + apply/orP; left.
+              exact: mem_head_segment_allowed Hcin_head Hblock.
+            + by apply/orP; right. }
+        have Htail := IH kt c Hkt Hc_tail.
+        have Hins_tail :
+          insert_after (a :: block ++ out') k c =
+            head ++ insert_after out' kt c.
+        { rewrite HkE.
+          change (insert_after (head ++ out') (size head + kt) c =
+            head ++ insert_after out' kt c).
+          exact: insert_after_cat_prefix. }
+        rewrite Hins_tail /head.
+        exact: pump_semantic_cons Hblock Htail.
+  Qed.
+
+  Lemma nth_mem_take_prefix (out : word) k i :
+    i <= k ->
+    k < size out ->
+    nth d0 out i \in take k.+1 out.
+  Proof.
+    move=> Hik Hk.
+    have Hi_take : i < size (take k.+1 out).
+    { have Hle : k.+1 <= size out by exact: Hk.
+      have Hsize : size (take k.+1 out) = k.+1.
+      { rewrite size_take. by case: (minn_idPl Hle). }
+      by rewrite Hsize ltnS. }
+    have Hik' : i < k.+1 by rewrite ltnS.
+    rewrite -(@nth_take k.+1 char d0 i Hik' out).
+    exact: mem_nth Hi_take.
+  Qed.
+
+  Lemma pump_semantic_closed X s out out' :
+    pump_semantic X s out ->
+    @pumping char d0 out out' ->
+    pump_semantic X s out'.
+  Proof.
+    move=> Hsem.
+    rewrite /pumping.
+    move/hasP=> [k Hkmem].
+    move/andP=> [Hk Hhas].
+    move/hasP: Hhas=> [i Himem].
+    move/andP=> [Hik /eqP ->].
+    rewrite /pump_at.
+    change (pump_semantic X s (insert_after out k (nth d0 out i))).
+    apply: (@pump_semantic_insert_at X s out k (nth d0 out i) Hsem Hk).
+    apply/orP; right.
+    exact: nth_mem_take_prefix.
+  Qed.
+
+  Lemma pumping_closure_singleton_to_semantic w out :
+    @pumping_closure char d0 (pred1 w) out ->
+    pump_semantic set0 w out.
+  Proof.
+    move=> Hclos.
+    elim: Hclos => [u Hu | u v _ IH Hpump].
+    - move/eqP: Hu => ->. exact: pump_semantic_base.
+    - exact: pump_semantic_closed IH Hpump.
+  Qed.
+
+  Lemma pumping_closure_singleton_to_re w out :
+    @pumping_closure char d0 (pred1 w) out ->
+    out \in pumping_singleton_re w.
+  Proof.
+    move=> Hclos.
+    exact ((proj1 (pump_semanticP set0 w out))
+      (pumping_closure_singleton_to_semantic w out Hclos)).
+  Qed.
+
   Lemma subset_word_symbols_all (u v : word) :
     word_symbols u \subset word_symbols v ->
     all (fun c => c \in v) u.
@@ -768,6 +1056,52 @@ Section PumpingClosureRegularity.
       { have := IH (p ++ [:: c]) s (all_mem_catl p [:: c] block Hall).
         by rewrite -!catA /=. }
       exact: pumping_closure_lift_closure Hfirst Hrest.
+  Qed.
+
+  Lemma all_word_symbols_mem (p block : word) :
+    all (fun c => c \in word_symbols p) block ->
+    all (fun c => c \in p) block.
+  Proof.
+    move/allP=> Hall.
+    apply/allP=> c Hc.
+    by rewrite -mem_word_symbols; exact: Hall.
+  Qed.
+
+  Lemma pump_semantic_to_closure_from p s out :
+    pump_semantic (word_symbols p) s out ->
+    @pumping_closure char d0 (pred1 (p ++ s)) (p ++ out).
+  Proof.
+    move E: (word_symbols p) => X Hsem.
+    elim: Hsem p E => [Y|Y a rest block out' Hblock _ IH] p E /=.
+    - exact: (@pumping_closure_base char d0 (pred1 (p ++ [::]))
+        (p ++ [::]) (eq_refl _)).
+    - have Epa : word_symbols (p ++ [:: a]) = word_symbols p :|: [set a].
+      { by rewrite word_symbols_cat /= setU0. }
+      have EpaY : word_symbols (p ++ [:: a]) = Y :|: [set a].
+      { by rewrite Epa E. }
+      have Htail :
+        @pumping_closure char d0 (pred1 ((p ++ [:: a]) ++ rest))
+          ((p ++ [:: a]) ++ out') :=
+        IH (p ++ [:: a]) EpaY.
+      rewrite -!catA /= in Htail.
+      have Hblock' : all (fun c => c \in p ++ [:: a]) block.
+      { apply: all_word_symbols_mem.
+        by rewrite Epa E. }
+      have Hins :
+        @pumping_closure char d0 (pred1 (p ++ a :: out'))
+          (p ++ a :: block ++ out').
+      { have := pumping_insert_block_after_prefix (p ++ [:: a]) block out' Hblock'.
+        by rewrite -!catA /=. }
+      exact: pumping_closure_lift_closure Htail Hins.
+  Qed.
+
+  Lemma pump_semantic_to_closure w out :
+    pump_semantic set0 w out ->
+    @pumping_closure char d0 (pred1 w) out.
+  Proof.
+    move=> Hsem.
+    have := pump_semantic_to_closure_from [::] w out Hsem.
+    by rewrite /=.
   Qed.
 
   Fixpoint factor_basis (p : word) (vv : seq word) : seq word :=

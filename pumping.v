@@ -1405,3 +1405,16 @@ Section PumpingClosureRegularity.
   Qed.
 
 End PumpingClosureRegularity.
+
+Section InterleavingClosedness.
+  Variable char : finType.
+  Notation word := (RegLang.languages.word char).
+  Notation lang := (RegLang.languages.lang char).
+  Notation dlang := (RegLang.languages.dlang char).
+
+  Import RegLang.regexp.
+
+  Notation regexp := (RegLang.regexp.regexp char).
+  Variable d0 : char.
+
+End InterleavingClosedness.

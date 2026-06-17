@@ -44,5 +44,4 @@ time-of-build-before.log
 time-of-build-both.log
 time-of-build-pretty.log
 .DS_Store
-REGULARITY_SESSION_SUMMARY.md
-INTERLEAVING_CLOSEDNESS_NOTES.md
+codex_*

@@ -1412,10 +1412,9 @@ Section InterleavingClosedness.
   Notation lang := (RegLang.languages.lang char).
   Notation dlang := (RegLang.languages.dlang char).
 
-  Import RegLang.regexp.
-
   Notation regexp := (RegLang.regexp.regexp char).
   Variable d0 : char.
+  Definition pumping_closure_lang (L:dlang) := fun w => @pumping_closure char d0 L w.
 
   Inductive interleaving : word -> word -> word -> Prop :=
   | interleaving_nil_l v :
@@ -1432,6 +1431,155 @@ Section InterleavingClosedness.
   Definition shuffle_closed (L : lang) :=
     forall u v w, L u -> L v -> interleaving u v w -> L w.
 
+  Definition seed_covers (seed w : word) :=
+    @pumping_closure char d0 (pred1 seed) w.
+
+  Definition covered_by (S : lang) : lang :=
+    fun w => exists2 seed, S seed & seed_covers seed w.
+
+  Definition seed_corpus (K : lang) (S : lang) :=
+    forall w, K w <-> covered_by S w.
+
+  Definition shuffle_lang (L1 L2 : lang) : lang :=
+    fun w => exists u v, [/\ L1 u, L2 v & interleaving u v w].
+
+  Lemma pumping_closure_seed_corpus (L : dlang) :
+    seed_corpus (pumping_closure_lang L) L.
+  Proof.
+    move=> w; split.
+    - move=> Hclos.
+      elim: Hclos => [u Hu | u v _ [seed Hseed Hseedu] Hpump].
+      + exists u => //.
+        exact: (@pumping_closure_base char d0 (pred1 u) u (eq_refl _)).
+      + exists seed => //.
+        exact: pumping_closure_step Hseedu Hpump.
+    - move=> [seed Hseed Hseedout].
+      exact: (@pumping_closure_lift_singleton char d0 L seed w Hseed Hseedout).
+  Qed.
+
+  Theorem same_seed_corpus_shuffle_closed (L : dlang) (S : lang) :
+    seed_corpus (pumping_closure_lang L) S ->
+    seed_corpus (shuffle_lang (covered_by S) (covered_by S)) S ->
+    shuffle_closed (pumping_closure_lang L).
+  Proof.
+    move=> Hcorpus Hshuffle u v w Hu Hv Hint.
+    have HuS : covered_by S u := (proj1 (Hcorpus u)) Hu.
+    have HvS : covered_by S v := (proj1 (Hcorpus v)) Hv.
+    have Hshuf : shuffle_lang (covered_by S) (covered_by S) w.
+    { exists u, v. by split. }
+    have HoutS : covered_by S w := (proj1 (Hshuffle w)) Hshuf.
+    exact: (proj2 (Hcorpus w)) HoutS.
+  Qed.
+
+  Fixpoint canonical_seed_from (seen : word) (w : word) : word :=
+    if w is a :: rest then
+      if a \in seen then canonical_seed_from seen rest
+      else a :: canonical_seed_from (seen ++ [:: a]) rest
+    else [::].
+
+  Definition canonical_seed (w : word) : word :=
+    canonical_seed_from [::] w.
+
+  Definition canonical_corpus (K : lang) : lang :=
+    fun seed => exists2 w, K w & canonical_seed w = seed.
+
+  Definition canonical_shuffle_stable (S : lang) :=
+    forall u v w,
+      S u ->
+      S v ->
+      interleaving u v w ->
+      S (canonical_seed w).
+
+  Lemma cat_singler_cons (p rest : word) a0 :
+    (p ++ [:: a0]) ++ rest = p ++ a0 :: rest.
+  Proof. by elim: p => [|x p IH] //=; rewrite IH. Qed.
+
+  Lemma canonical_seed_from_closure seen w :
+    pumping_closure_lang (pred1 (seen ++ canonical_seed_from seen w)) (seen ++ w).
+  Proof.
+    elim: w seen => [|a0 rest IH] seen /=.
+    - exact: (@pumping_closure_base char d0
+        (pred1 (seen ++ [::])) (seen ++ [::]) (eq_refl _)).
+    - case Ha: (a0 \in seen).
+      + have Htail := IH seen.
+        have Hinsert :
+          @pumping_closure char d0 (pred1 (seen ++ rest))
+            (seen ++ a0 :: rest).
+        { have Hall : all (fun c => c \in seen) [:: a0] by rewrite /= Ha.
+          have := @pumping_insert_block_after_prefix char d0 seen [:: a0] rest Hall.
+          by []. }
+        exact: (@pumping_closure_lift_closure char d0
+          (pred1 (seen ++ canonical_seed_from seen rest))
+          (seen ++ rest) (seen ++ a0 :: rest) Htail Hinsert).
+      + have Htail := IH (seen ++ [:: a0]).
+        rewrite -(cat_singler_cons seen
+          (canonical_seed_from (seen ++ [:: a0]) rest) a0).
+        rewrite -(cat_singler_cons seen rest a0).
+        exact: Htail.
+  Qed.
+
+  Lemma canonical_seed_covers w :
+    seed_covers (canonical_seed w) w.
+  Proof.
+    have := canonical_seed_from_closure [::] w.
+    by rewrite /seed_covers /canonical_seed /=.
+  Qed.
+
+  Lemma covered_by_canonical_corpus (K : lang) w :
+    K w ->
+    covered_by (canonical_corpus K) w.
+  Proof.
+    move=> Hout.
+    exists (canonical_seed w).
+    - by exists w.
+    - exact: canonical_seed_covers.
+  Qed.
+
+  Variables a b x y : char.
+
+  Example interleaving_ab_xy_axby :
+    interleaving [:: a; b] [:: x; y] [:: a; x; b; y].
+  Proof.
+    apply: interleaving_left.
+    apply: interleaving_right.
+    apply: interleaving_left.
+    apply: interleaving_right.
+    exact: interleaving_nil_l.
+  Qed.
+
+  Example interleaving_ab_xy_xaby :
+    interleaving [:: a; b] [:: x; y] [:: x; a; b; y].
+  Proof.
+    apply: interleaving_right.
+    apply: interleaving_left.
+    apply: interleaving_left.
+    apply: interleaving_right.
+    exact: interleaving_nil_l.
+  Qed.
+
+  Example interleaving_left_empty :
+    interleaving [::] [:: x; y] [:: x; y].
+  Proof. exact: interleaving_nil_l. Qed.
+
+  Example interleaving_right_empty :
+    interleaving [:: a; b] [::] [:: a; b].
+  Proof. exact: interleaving_nil_r. Qed.
+
+End InterleavingClosedness.
+
+(*
+Section InterleavingSpecificAttempts.
+  Variable char : finType.
+  Notation word := (RegLang.languages.word char).
+  Notation lang := (RegLang.languages.lang char).
+  Notation dlang := (RegLang.languages.dlang char).
+
+  Variable d0 : char.
+
+  Definition shuffle_closed (L : lang) :=
+    forall u v w,
+      L u -> L v -> @interleaving char u v w -> L w.
+
   Definition prefix_of (p s : word) :=
     exists t, s = p ++ t.
 
@@ -1444,7 +1592,7 @@ Section InterleavingClosedness.
       L seed2 ->
       @pumping_closure char d0 (pred1 seed1) out1 ->
       @pumping_closure char d0 (pred1 seed2) out2 ->
-      interleaving out1 out2 out ->
+      @interleaving char out1 out2 out ->
       exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
 
   Definition comparable_reseeding_complete (L : dlang) :=
@@ -1454,7 +1602,7 @@ Section InterleavingClosedness.
       prefix_of seed1 seed2 \/ prefix_of seed2 seed1 ->
       @pumping_closure char d0 (pred1 seed1) out1 ->
       @pumping_closure char d0 (pred1 seed2) out2 ->
-      interleaving out1 out2 out ->
+      @interleaving char out1 out2 out ->
       exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
 
   Lemma pumping_closure_origin (L : dlang) out :
@@ -1552,14 +1700,14 @@ Section InterleavingClosedness.
     forall u, L u <-> permall_seed s u \/ perm_suffix_seed s t u.
 
   Lemma interleaving_size u v w :
-    interleaving u v w -> size w = size u + size v.
+    @interleaving char u v w -> size w = size u + size v.
   Proof.
     elim=> [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] /=;
       by rewrite ?add0n ?addn0 ?IH ?addnS.
   Qed.
 
   Lemma interleaving_count_mem c u v w :
-    interleaving u v w ->
+    @interleaving char u v w ->
     count_mem c w = count_mem c u + count_mem c v.
   Proof.
     elim=> [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] /=.
@@ -1603,35 +1751,5 @@ Section InterleavingClosedness.
     apply: pump_semantic_count_ge.
     exact: (@pumping_closure_singleton_to_semantic char d0 s out Hclos).
   Qed.
-
-  Variables a b x y : char.
-
-  Example interleaving_ab_xy_axby :
-    interleaving [:: a; b] [:: x; y] [:: a; x; b; y].
-  Proof.
-    apply: interleaving_left.
-    apply: interleaving_right.
-    apply: interleaving_left.
-    apply: interleaving_right.
-    exact: interleaving_nil_l.
-  Qed.
-
-  Example interleaving_ab_xy_xaby :
-    interleaving [:: a; b] [:: x; y] [:: x; a; b; y].
-  Proof.
-    apply: interleaving_right.
-    apply: interleaving_left.
-    apply: interleaving_left.
-    apply: interleaving_right.
-    exact: interleaving_nil_l.
-  Qed.
-
-  Example interleaving_left_empty :
-    interleaving [::] [:: x; y] [:: x; y].
-  Proof. exact: interleaving_nil_l. Qed.
-
-  Example interleaving_right_empty :
-    interleaving [:: a; b] [::] [:: a; b].
-  Proof. exact: interleaving_nil_r. Qed.
-
-End InterleavingClosedness.
+End InterleavingSpecificAttempts.
+*)

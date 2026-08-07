@@ -1429,6 +1429,186 @@ Section InterleavingClosedness.
       interleaving u v w ->
       interleaving u (b :: v) (b :: w).
 
+  Lemma interleaving_sym u v w :
+    interleaving u v w -> interleaving v u w.
+  Proof.
+    move=> Hint.
+    elim: Hint => [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH].
+    - exact: interleaving_nil_r.
+    - exact: interleaving_nil_l.
+    - exact: interleaving_right IH.
+    - exact: interleaving_left IH.
+  Qed.
+
+  Lemma interleaving_cat_pair u1 v1 w1 u2 v2 w2 :
+    interleaving u1 v1 w1 ->
+    interleaving u2 v2 w2 ->
+    interleaving (u1 ++ u2) (v1 ++ v2) (w1 ++ w2).
+  Proof.
+    move=> Hfirst Hsecond.
+    elim: Hfirst => [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] /=.
+    - elim: v0 => [|b0 v0 IH] //=.
+      exact: interleaving_right IH.
+    - elim: u0 => [|a0 u0 IH] //=.
+      exact: interleaving_left IH.
+    - exact: interleaving_left IH.
+    - exact: interleaving_right IH.
+  Qed.
+
+  Lemma interleaving_mem_left u v w c :
+    interleaving u v w -> c \in u -> c \in w.
+  Proof.
+    move=> Hint.
+    elim: Hint => [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] //=.
+    - move/orP=> [Hca | Hcu]; apply/orP.
+      + by left.
+      + right. exact: IH.
+    - move=> Hcu. apply/orP; right. exact: IH.
+  Qed.
+
+  Lemma interleaving_split_left_prefix u v w :
+    interleaving u v w ->
+    forall p s,
+      u = p ++ s ->
+      exists v1 v2 w1 w2,
+        [/\ v = v1 ++ v2,
+            w = w1 ++ w2,
+            interleaving p v1 w1 &
+            interleaving s v2 w2].
+  Proof.
+    move=> Hint.
+    elim: Hint => [v0|u0|a0 u0 v0 w0 Htail IH|b0 u0 v0 w0 Htail IH]
+      p s Heq.
+    - case: p Heq => [|x p] //=.
+      case: s => [|x s] //= _.
+      exists [::], v0, [::], v0.
+      split=> //; exact: interleaving_nil_l.
+    - subst u0.
+      exists [::], [::], p, s.
+      split=> //; exact: interleaving_nil_r.
+    - case: p Heq => [|x p] /=.
+      + move=> Heq; subst s.
+        exists [::], v0, [::], (a0 :: w0).
+        split=> //.
+        * exact: interleaving_nil_l.
+        * exact: interleaving_left Htail.
+      + move=> Heq.
+        injection Heq as Hax Hu.
+        subst x u0.
+        have [v1 [v2 [w1 [w2 [Hv Hw Hp Hs]]]]] := IH p s erefl.
+        exists v1, v2, (a0 :: w1), w2.
+        split.
+        * exact: Hv.
+        * by rewrite Hw.
+        * exact: interleaving_left Hp.
+        * exact: Hs.
+    - have [v1 [v2 [w1 [w2 [Hv Hw Hp Hs]]]]] := IH p s Heq.
+      exists (b0 :: v1), v2, (b0 :: w1), w2.
+      split.
+      + by rewrite Hv.
+      + by rewrite Hw.
+      + exact: interleaving_right Hp.
+      + exact: Hs.
+  Qed.
+
+  Lemma interleaving_first_left a0 u v w :
+    interleaving (a0 :: u) v w ->
+    exists v1 v2 rest,
+      [/\ v = v1 ++ v2,
+          w = v1 ++ a0 :: rest &
+          interleaving u v2 rest].
+  Proof.
+    move=> Hint.
+    remember (a0 :: u) as left eqn:Hleft.
+    move: a0 u Hleft.
+    elim: Hint => [v0|u0|a1 u0 v0 w0 Htail IH|b0 u0 v0 w0 Htail IH]
+      a0 u Heq.
+    - discriminate Heq.
+    - subst u0.
+      exists [::], [::], u.
+      split=> //; exact: interleaving_nil_r.
+    - injection Heq as Ha Hu.
+      subst a1 u0.
+      exists [::], v0, w0.
+      split=> //.
+    - subst u0.
+      have [v1 [v2 [rest [Hv Hw Hrest]]]] := IH a0 u erefl.
+      exists (b0 :: v1), v2, rest.
+      split.
+      + by rewrite Hv.
+      + by rewrite Hw.
+      + exact: Hrest.
+  Qed.
+
+  Lemma pumping_decompose u u' :
+    @pumping char d0 u u' ->
+    exists p s c,
+      [/\ u = p ++ s,
+          u' = p ++ c :: s &
+          c \in p].
+  Proof.
+    rewrite /pumping.
+    move/hasP=> [k Hkmem].
+    move/andP=> [Hk Hhas].
+    move/hasP: Hhas=> [i Himem].
+    move/andP=> [Hik /eqP ->].
+    exists (take k.+1 u), (drop k.+1 u), (nth d0 u i).
+    split.
+    - symmetry. exact: cat_take_drop.
+    - by rewrite /pump_at.
+    - exact: (@nth_mem_take_prefix char d0 u k i Hik Hk).
+  Qed.
+
+  (* Removing a pumped component letter removes one repeated letter from the
+     shuffled output, so the same pump step reconstructs the original output. *)
+  Lemma pumping_interleaving_left u u' v w' :
+    @pumping char d0 u u' ->
+    interleaving u' v w' ->
+    exists w,
+      interleaving u v w /\ @pumping char d0 w w'.
+  Proof.
+    move=> Hpump Hint.
+    have [p [s [c [Hu Hu' Hcp]]]] := pumping_decompose u u' Hpump.
+    subst u u'.
+    have [v1 [v2 [w1 [w2 [Hv Hw Hpre Hpost]]]]] :=
+      interleaving_split_left_prefix (p ++ c :: s) v w' Hint
+        p (c :: s) erefl.
+    have [va [vb [rest [Hv2 Hw2 Hrest]]]] :=
+      interleaving_first_left c s v2 w2 Hpost.
+    have Hprefix : interleaving p (v1 ++ va) (w1 ++ va).
+    { have Hcat := interleaving_cat_pair p v1 w1 [::] va va
+        Hpre (interleaving_nil_l va).
+      by rewrite cats0 in Hcat. }
+    have Hout : interleaving (p ++ s) ((v1 ++ va) ++ vb)
+        ((w1 ++ va) ++ rest) :=
+      interleaving_cat_pair p (v1 ++ va) (w1 ++ va) s vb rest
+        Hprefix Hrest.
+    have Hc_w1 : c \in w1 := interleaving_mem_left p v1 w1 c Hpre Hcp.
+    have Hc_prefix : c \in w1 ++ va by rewrite mem_cat Hc_w1.
+    exists ((w1 ++ va) ++ rest); split.
+    - move: Hout.
+      by rewrite -catA -Hv2 -Hv.
+    - have Hins := @pumping_insert_char_after_prefix char d0
+        (w1 ++ va) rest c Hc_prefix.
+      have Hw'_eq : w' = (w1 ++ va) ++ c :: rest.
+      { by rewrite Hw Hw2 catA. }
+      rewrite Hw'_eq.
+      exact: Hins.
+  Qed.
+
+  Lemma pumping_interleaving_right u v v' w' :
+    @pumping char d0 v v' ->
+    interleaving u v' w' ->
+    exists w,
+      interleaving u v w /\ @pumping char d0 w w'.
+  Proof.
+    move=> Hpump Hint.
+    have [w [Hint' Hw]] := pumping_interleaving_left v v' u w'
+      Hpump (interleaving_sym u v' w' Hint).
+    exists w; split=> //.
+    exact: interleaving_sym v u w Hint'.
+  Qed.
+
   Definition shuffle_closed (L : lang) :=
     forall u v w, L u -> L v -> interleaving u v w -> L w.
 
@@ -1437,6 +1617,16 @@ Section InterleavingClosedness.
 
   Definition covered_by (S : lang) : lang :=
     fun w => exists2 seed, S seed & seed_covers seed w.
+
+  Definition seed_shuffle_covered (S : lang) :=
+    forall u v w,
+      S u ->
+      S v ->
+      interleaving u v w ->
+      covered_by S w.
+
+  Definition base_shuffle_covered (L : lang) :=
+    seed_shuffle_covered L.
 
   Definition seed_corpus (K : lang) (S : lang) :=
     forall w, K w <-> covered_by S w.
@@ -1477,6 +1667,88 @@ Section InterleavingClosedness.
   Proof.
     move=> Hst Htw.
     exact: (@pumping_closure_lift_closure char d0 (pred1 s) t w Hst Htw).
+  Qed.
+
+  Lemma seed_covers_interleaving_left s u v w :
+    seed_covers s u ->
+    interleaving u v w ->
+    exists z,
+      interleaving s v z /\ seed_covers z w.
+  Proof.
+    move=> Hcover.
+    elim: Hcover v w => [u0 Hu0|u0 u1 Hcover IH Hpump] v w Hint.
+    - move/eqP: Hu0=> Hu0.
+      subst u0.
+      exists w; split=> //.
+      exact: (@pumping_closure_base char d0 (pred1 w) w (eq_refl _)).
+    - have [w0 [Hint0 Hpumpw]] :=
+        pumping_interleaving_left u0 u1 v w Hpump Hint.
+      have [z [Hz Hzw0]] := IH v w0 Hint0.
+      exists z; split=> //.
+      exact: pumping_closure_step Hzw0 Hpumpw.
+  Qed.
+
+  Lemma seed_covers_interleaving_right s u v w :
+    seed_covers s v ->
+    interleaving u v w ->
+    exists z,
+      interleaving u s z /\ seed_covers z w.
+  Proof.
+    move=> Hcover Hint.
+    have [z [Hz Hzw]] := seed_covers_interleaving_left s v u w
+      Hcover (interleaving_sym u v w Hint).
+    exists z; split=> //.
+    exact: interleaving_sym s u z Hz.
+  Qed.
+
+  Lemma seed_cover_interleaving_factor su sv u v w :
+    seed_covers su u ->
+    seed_covers sv v ->
+    interleaving u v w ->
+    exists z,
+      interleaving su sv z /\ seed_covers z w.
+  Proof.
+    move=> Hsu Hsv Hint.
+    have [mid [Hmid Hmidw]] :=
+      seed_covers_interleaving_left su u v w Hsu Hint.
+    have [z [Hz Hzmid]] :=
+      seed_covers_interleaving_right sv su v mid Hsv Hmid.
+    exists z; split=> //.
+    exact: seed_covers_trans Hzmid Hmidw.
+  Qed.
+
+  Theorem seed_corpus_shuffle_covered_closed
+      (L : dlang) (S : lang) :
+    seed_corpus (pumping_closure_lang L) S ->
+    seed_shuffle_covered S ->
+    shuffle_closed (pumping_closure_lang L).
+  Proof.
+    move=> Hcorpus Hstable u v w Hu Hv Hint.
+    have [su Hsu Hsuu] := (proj1 (Hcorpus u)) Hu.
+    have [sv Hsv Hsvv] := (proj1 (Hcorpus v)) Hv.
+    have [z [Hz Hzw]] := seed_cover_interleaving_factor su sv u v w
+      Hsuu Hsvv Hint.
+    have [seed Hseed Hseedz] := Hstable su sv z Hsu Hsv Hz.
+    apply: (proj2 (Hcorpus w)).
+    exists seed => //.
+    exact: seed_covers_trans Hseedz Hzw.
+  Qed.
+
+  Theorem base_shuffle_coveredP (L : dlang) :
+    base_shuffle_covered L <->
+    shuffle_closed (pumping_closure_lang L).
+  Proof.
+    split.
+    - move=> Hbase.
+      exact: (seed_corpus_shuffle_covered_closed L L
+        (pumping_closure_seed_corpus L) Hbase).
+    - move=> Hclosed u v w Hu Hv Hint.
+      have Hu' : pumping_closure_lang L u :=
+        @pumping_closure_base char d0 L u Hu.
+      have Hv' : pumping_closure_lang L v :=
+        @pumping_closure_base char d0 L v Hv.
+      exact: (proj1 (pumping_closure_seed_corpus L w))
+        (Hclosed u v w Hu' Hv' Hint).
   Qed.
 
   Lemma seed_covers_refl s :
@@ -1520,20 +1792,6 @@ Section InterleavingClosedness.
     exact: seed_covers_same_size Hst Hsize.
   Qed.
 
-  Lemma strict_seed_covers_size_lt s t :
-    seed_covers s t ->
-    ~ seed_covers t s ->
-    size s < size t.
-  Proof.
-    move=> Hst Hnot.
-    have Hle : size s <= size t := seed_covers_size_ge s t Hst.
-    rewrite leq_eqVlt in Hle.
-    case/orP: Hle => [/eqP Hsize | Hlt]; last exact: Hlt.
-    have Heq : s = t := seed_covers_same_size s t Hst Hsize.
-    move: Hnot; rewrite Heq => Hnot.
-    exfalso. exact: Hnot (seed_covers_refl t).
-  Qed.
-
   Lemma distinct_seed_covers_size_lt s t :
     seed_covers s t ->
     s <> t ->
@@ -1547,41 +1805,20 @@ Section InterleavingClosedness.
     by case: Hneq.
   Qed.
 
-  Definition cover_le (s t : word) :=
+  Lemma seed_covers_principal_inclusion s t :
+    seed_covers s t <->
     forall w, seed_covers t w -> seed_covers s w.
-
-  Lemma cover_leP s t :
-    cover_le s t <-> seed_covers s t.
   Proof.
     split.
-    - move=> Hle. exact: (Hle t (seed_covers_refl t)).
     - move=> Hst w Htw. exact: seed_covers_trans Hst Htw.
-  Qed.
-
-  Lemma cover_le_refl s :
-    cover_le s s.
-  Proof. by []. Qed.
-
-  Lemma cover_le_trans s t u :
-    cover_le s t -> cover_le t u -> cover_le s u.
-  Proof.
-    move=> Hst Htu w Huw.
-    exact: Hst (Htu w Huw).
-  Qed.
-
-  Lemma cover_le_antisym s t :
-    cover_le s t -> cover_le t s -> s = t.
-  Proof.
-    move/cover_leP=> Hst.
-    move/cover_leP=> Hts.
-    exact: seed_covers_antisym Hst Hts.
+    - move=> Hsub. exact: (Hsub t (seed_covers_refl t)).
   Qed.
 
   Definition minimal_seed_corpus (L : lang) : lang :=
     fun seed =>
       L seed /\
       forall seed',
-        L seed' -> cover_le seed' seed -> seed' = seed.
+        L seed' -> seed_covers seed' seed -> seed' = seed.
 
   Lemma minimal_seed_corpus_sub (L : lang) seed :
     minimal_seed_corpus L seed -> L seed.
@@ -1608,8 +1845,7 @@ Section InterleavingClosedness.
           move: Hlt. by rewrite Hempty.
         + move=> Hnone.
           exists cur.
-          * split=> // seed' Hseed' Hle.
-            move/cover_leP: Hle=> Hcover.
+          * split=> // seed' Hseed' Hcover.
             case: (classic (seed' = cur)) => // Hneq.
             by case: Hnone; exists seed'.
           * exact: seed_covers_refl.
@@ -1626,8 +1862,7 @@ Section InterleavingClosedness.
           exact: seed_covers_trans Hmin_seed' Hcover.
         + move=> Hnone.
           exists cur.
-          * split=> // seed' Hseed' Hle.
-            move/cover_leP: Hle=> Hcover.
+          * split=> // seed' Hseed' Hcover.
             case: (classic (seed' = cur)) => // Hneq.
             by case: Hnone; exists seed'.
           * exact: seed_covers_refl. }
@@ -1648,8 +1883,15 @@ Section InterleavingClosedness.
         (minimal_seed_corpus_sub L seed Hmin) Hseedw).
   Qed.
 
-  Theorem minimal_seed_corpus_closedness (L : dlang) :
-    seed_corpus (pumping_closure_lang L) (minimal_seed_corpus L) ->
+  Theorem minimal_seed_shuffle_closed (L : dlang) :
+    seed_shuffle_covered (minimal_seed_corpus L) ->
+    shuffle_closed (pumping_closure_lang L).
+  Proof.
+    exact: (seed_corpus_shuffle_covered_closed L (minimal_seed_corpus L)
+      (minimal_seed_corpus_seed_corpus L)).
+  Qed.
+
+  Theorem minimal_seed_corpus_exact_shuffle_closed (L : dlang) :
     seed_corpus
       (shuffle_lang
         (covered_by (minimal_seed_corpus L))
@@ -1657,7 +1899,8 @@ Section InterleavingClosedness.
       (minimal_seed_corpus L) ->
     shuffle_closed (pumping_closure_lang L).
   Proof.
-    exact: same_seed_corpus_shuffle_closed.
+    apply: same_seed_corpus_shuffle_closed.
+    exact: minimal_seed_corpus_seed_corpus.
   Qed.
 
   Fixpoint canonical_seed_from (seen : word) (w : word) : word :=
@@ -1668,9 +1911,6 @@ Section InterleavingClosedness.
 
   Definition canonical_seed (w : word) : word :=
     canonical_seed_from [::] w.
-
-  Definition canonical_corpus (K : lang) : lang :=
-    fun seed => exists2 w, K w & canonical_seed w = seed.
 
   Definition canonical_shuffle_stable (S : lang) :=
     forall u v w,
@@ -1829,6 +2069,15 @@ Section InterleavingClosedness.
     by rewrite /seed_covers /canonical_seed /=.
   Qed.
 
+  Lemma canonical_shuffle_stable_seed_shuffle_covered (S : lang) :
+    canonical_shuffle_stable S -> seed_shuffle_covered S.
+  Proof.
+    move=> Hstable u v w Hu Hv Hint.
+    exists (canonical_seed w).
+    - exact: Hstable u v w Hu Hv Hint.
+    - exact: canonical_seed_covers.
+  Qed.
+
   Lemma stable_minimal_seed_canonical (L : dlang) :
     canonical_shuffle_stable (minimal_seed_corpus L) ->
     forall seed,
@@ -1845,7 +2094,28 @@ Section InterleavingClosedness.
     case: Hmin => _ Hmin'.
     apply: Hmin'.
     - exact: minimal_seed_corpus_sub Hcan_min.
-    - by apply/cover_leP.
+    - exact: Hcan_seed.
+  Qed.
+
+  Lemma stable_pumping_closureP (L : dlang) :
+    canonical_shuffle_stable (minimal_seed_corpus L) ->
+    forall w,
+      pumping_closure_lang L w <->
+      minimal_seed_corpus L (canonical_seed w).
+  Proof.
+    move=> Hstable w; split.
+    - move/(proj1 (minimal_seed_corpus_seed_corpus L w))
+        => [seed Hmin Hseedw].
+      have Hcan_seed := stable_minimal_seed_canonical L Hstable seed Hmin.
+      have Hcan_w : canonical_seed w = seed.
+      { rewrite (seed_covers_canonical_seed seed w Hseedw).
+        exact: Hcan_seed. }
+      by rewrite Hcan_w.
+    - move=> Hmin.
+      exact: (@pumping_closure_lift_singleton char d0 L
+        (canonical_seed w) w
+        (minimal_seed_corpus_sub L (canonical_seed w) Hmin)
+        (canonical_seed_covers w)).
   Qed.
 
   Lemma all_mem_cat_r (seen extra xs : word) :
@@ -1984,56 +2254,14 @@ Section InterleavingClosedness.
     exists z; split=> //.
   Qed.
 
-  Theorem closedness (L : dlang) :
+  Theorem minimal_seed_corpus_shuffle_closed (L : dlang) :
     canonical_shuffle_stable (minimal_seed_corpus L) ->
     shuffle_closed (pumping_closure_lang L).
   Proof.
-    move=> Hstable u v w Hu Hv Hint.
-    pose S := minimal_seed_corpus L.
-    have Hcorpus : seed_corpus (pumping_closure_lang L) S :=
-      minimal_seed_corpus_seed_corpus L.
-    have HuS : covered_by S u := (proj1 (Hcorpus u)) Hu.
-    have HvS : covered_by S v := (proj1 (Hcorpus v)) Hv.
-    case: HuS => su Hsu Hsuu.
-    case: HvS => sv Hsv Hsvv.
-    have Hcu_su : canonical_seed u = su.
-    { rewrite (seed_covers_canonical_seed su u Hsuu).
-      exact: (stable_minimal_seed_canonical L Hstable su Hsu). }
-    have Hcv_sv : canonical_seed v = sv.
-    { rewrite (seed_covers_canonical_seed sv v Hsvv).
-      exact: (stable_minimal_seed_canonical L Hstable sv Hsv). }
-    have [z [Hz Hcz]] := canonical_interleaving_factor u v w Hint.
-    have Hz' : interleaving su sv z.
-    { move: Hz.
-      by rewrite Hcu_su Hcv_sv. }
-    have Hseed : S (canonical_seed w).
-    { have := Hstable su sv z Hsu Hsv Hz'.
-      by rewrite Hcz. }
-    have Hcovered : covered_by S w.
-    { exists (canonical_seed w) => //.
-      exact: canonical_seed_covers w. }
-    exact: (proj2 (Hcorpus w)) Hcovered.
+    move=> Hstable.
+    apply: minimal_seed_shuffle_closed.
+    exact: canonical_shuffle_stable_seed_shuffle_covered Hstable.
   Qed.
-
-  Lemma covered_by_canonical_corpus (K : lang) w :
-    K w ->
-    covered_by (canonical_corpus K) w.
-  Proof.
-    move=> Hout.
-    exists (canonical_seed w).
-    - by exists w.
-    - exact: canonical_seed_covers.
-  Qed.
-
-  (*
-  This tempting theorem is false as stated.  The canonical corpus forgets
-  repeated milestone obligations in base words, so stability of canonical seeds
-  alone is not enough to imply shuffle closedness of the pumping closure.
-
-  Theorem closedness L :
-    canonical_shuffle_stable (canonical_corpus L) ->
-    shuffle_closed (pumping_closure_lang L).
-  *)
 
   Variables a b x y : char.
 

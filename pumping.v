@@ -2295,8 +2295,7 @@ Section InterleavingClosedness.
 
 End InterleavingClosedness.
 
-(*
-Section InterleavingSpecificAttempts.
+Section SpecialCases.
   Variable char : finType.
   Notation word := (RegLang.languages.word char).
   Notation lang := (RegLang.languages.lang char).
@@ -2304,135 +2303,18 @@ Section InterleavingSpecificAttempts.
 
   Variable d0 : char.
 
-  Definition shuffle_closed (L : lang) :=
-    forall u v w,
-      L u -> L v -> @interleaving char u v w -> L w.
-
   Definition prefix_of (p s : word) :=
     exists t, s = p ++ t.
 
   Definition prefix_include (L : dlang) :=
-    exists2 s, L s & forall u, L u -> prefix_of u s.
-
-  Definition singleton_reseeding_complete (L : dlang) :=
-    forall seed1 seed2 out1 out2 out,
-      L seed1 ->
-      L seed2 ->
-      @pumping_closure char d0 (pred1 seed1) out1 ->
-      @pumping_closure char d0 (pred1 seed2) out2 ->
-      @interleaving char out1 out2 out ->
-      exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
-
-  Definition comparable_reseeding_complete (L : dlang) :=
-    forall seed1 seed2 out1 out2 out,
-      L seed1 ->
-      L seed2 ->
-      prefix_of seed1 seed2 \/ prefix_of seed2 seed1 ->
-      @pumping_closure char d0 (pred1 seed1) out1 ->
-      @pumping_closure char d0 (pred1 seed2) out2 ->
-      @interleaving char out1 out2 out ->
-      exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
-
-  Lemma pumping_closure_origin (L : dlang) out :
-    @pumping_closure char d0 L out ->
-    exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
-  Proof.
-    move=> Hclos.
-    elim: Hclos => [u Hu | u v _ [seed Hseed Hseedu] Hpump].
-    - exists u => //.
-      exact: (@pumping_closure_base char d0 (pred1 u) u (eq_refl _)).
-    - exists seed => //.
-      exact: pumping_closure_step Hseedu Hpump.
-  Qed.
-
-  Theorem reseeding_complete_pumping_closure_shuffle_closed (L : dlang) :
-    singleton_reseeding_complete L ->
-    shuffle_closed (fun out => @pumping_closure char d0 L out).
-  Proof.
-    move=> Hreseed out1 out2 out Hout1 Hout2 Hint.
-    case: (pumping_closure_origin L out1 Hout1) => seed1 Hseed1 Hseed1out.
-    case: (pumping_closure_origin L out2 Hout2) => seed2 Hseed2 Hseed2out.
-    case: (Hreseed seed1 seed2 out1 out2 out
-             Hseed1 Hseed2 Hseed1out Hseed2out Hint)
-      => seed Hseed Hseedout.
-    exact: (@pumping_closure_lift_singleton char d0 L seed out Hseed Hseedout).
-  Qed.
-
-  Lemma prefix_of_take p s :
-    prefix_of p s -> p = take (size p) s.
-  Proof.
-    move=> [t ->].
-    by rewrite take_size_cat.
-  Qed.
-
-  Lemma prefix_of_comparable_by_size p q s :
-    prefix_of p s ->
-    prefix_of q s ->
-    size p <= size q ->
-    prefix_of p q.
-  Proof.
-    move=> [prest ->] [qrest Hq] Hsize.
-    exists (drop (size p) q).
-    rewrite -{1}(cat_take_drop (size p) q).
-    have Htake : p = take (size p) q.
-    { have Heq := congr1 (take (size p)) Hq.
-      move: Heq.
-      rewrite take_size_cat //.
-      rewrite (@takel_cat (size p) char q qrest Hsize).
-      by []. }
-    by rewrite -Htake.
-  Qed.
-
-  Lemma prefix_include_seeds_comparable (L : dlang) seed1 seed2 :
-    prefix_include L ->
-    L seed1 ->
-    L seed2 ->
-    prefix_of seed1 seed2 \/ prefix_of seed2 seed1.
-  Proof.
-    move=> [top Htop Hall] Hseed1 Hseed2.
-    have Hpref1 : prefix_of seed1 top := Hall seed1 Hseed1.
-    have Hpref2 : prefix_of seed2 top := Hall seed2 Hseed2.
-    case Hle: (size seed1 <= size seed2).
-    - left. exact: (prefix_of_comparable_by_size seed1 seed2 top Hpref1 Hpref2 Hle).
-    - right.
-      have Hlt : size seed2 < size seed1 by rewrite ltnNge Hle.
-      have Hle' : size seed2 <= size seed1 := ltnW Hlt.
-      exact: (prefix_of_comparable_by_size seed2 seed1 top Hpref2 Hpref1 Hle').
-  Qed.
-
-  Theorem prefix_include_pumping_closure_shuffle_closed_from_comparable_reseeding
-      (L : dlang) :
-    prefix_include L ->
-    comparable_reseeding_complete L ->
-    shuffle_closed (fun out => @pumping_closure char d0 L out).
-  Proof.
-    move=> Hprefix Hreseed.
-    apply: reseeding_complete_pumping_closure_shuffle_closed.
-    move=> seed1 seed2 out1 out2 out Hseed1 Hseed2 Hout1 Hout2 Hint.
-    apply: Hreseed Hout1 Hout2 Hint.
-    - exact: Hseed1.
-    - exact: Hseed2.
-    - exact: prefix_include_seeds_comparable Hprefix Hseed1 Hseed2.
-  Qed.
+    exists2 top, L top & forall seed, L seed -> prefix_of seed top.
 
   Definition perm_word (s u : word) :=
     perm_eq s u.
 
-  Definition permall_seed (s u : word) :=
-    exists2 p, prefix_of p s & perm_word p u.
-
-  Definition perm_suffix_seed (s t u : word) :=
-    exists2 p, perm_word s p & u = p ++ t.
-
-  Definition permutation_extended (L : dlang) (s t : word) :=
-    forall u, L u <-> permall_seed s u \/ perm_suffix_seed s t u.
-
-  Lemma interleaving_size u v w :
-    @interleaving char u v w -> size w = size u + size v.
-  Proof.
-    elim=> [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] /=;
-      by rewrite ?add0n ?addn0 ?IH ?addnS.
-  Qed.
+  Definition permutation_collection (L : dlang) (top : word) :=
+    forall seed,
+      L seed <-> exists2 p, prefix_of p top & perm_word p seed.
 
   Lemma interleaving_count_mem c u v w :
     @interleaving char u v w ->
@@ -2445,39 +2327,529 @@ Section InterleavingSpecificAttempts.
     - by rewrite IH addnCA.
   Qed.
 
+  Lemma prefix_of_mem p s c :
+    prefix_of p s -> c \in p -> c \in s.
+  Proof.
+    move=> [t ->] Hc.
+    by rewrite mem_cat Hc.
+  Qed.
+
+  Lemma prefix_of_count_le p s c :
+    prefix_of p s -> count_mem c p <= count_mem c s.
+  Proof.
+    move=> [t ->].
+    by rewrite count_cat leq_addr.
+  Qed.
+
+  Lemma prefix_of_refl s : prefix_of s s.
+  Proof. by exists [::]; rewrite cats0. Qed.
+
+  Lemma prefix_of_trans p q s :
+    prefix_of p q -> prefix_of q s -> prefix_of p s.
+  Proof.
+    move=> [r ->] [t ->].
+    exists (r ++ t).
+    by rewrite catA.
+  Qed.
+
+  Lemma prefix_of_rcons s a0 : prefix_of s (rcons s a0).
+  Proof. by exists [:: a0]; rewrite cats1. Qed.
+
+  Lemma prefix_of_size p s :
+    prefix_of p s -> size p <= size s.
+  Proof.
+    move=> [t ->].
+    by rewrite size_cat leq_addr.
+  Qed.
+
+  Lemma prefix_of_same_size p s :
+    prefix_of p s -> size p = size s -> p = s.
+  Proof.
+    move=> [t Hs] Hsize.
+    subst s.
+    have Ht0 : size t = 0.
+    { apply/eqP.
+      move/eqP: Hsize.
+      by rewrite size_cat -{1}(addn0 (size p)) eqn_add2l eq_sym. }
+    move/size0nil: Ht0=> ->.
+    by rewrite cats0.
+  Qed.
+
+  Lemma prefix_of_comparable_by_size p q top :
+    prefix_of p top ->
+    prefix_of q top ->
+    size p <= size q ->
+    prefix_of p q.
+  Proof.
+    move=> Hp Hq Hsize.
+    exists (drop (size p) q).
+    rewrite -{1}(cat_take_drop (size p) q).
+    have Htakep : p = take (size p) top.
+    { case: Hp=> rest ->. by rewrite take_size_cat. }
+    have Htakeq : take (size p) q = take (size p) top.
+    { case: Hq=> rest ->.
+      by rewrite (@takel_cat (size p) char q rest Hsize). }
+    by rewrite Htakeq -Htakep.
+  Qed.
+
+  Lemma prefix_of_comparable p q top :
+    prefix_of p top ->
+    prefix_of q top ->
+    prefix_of p q \/ prefix_of q p.
+  Proof.
+    move=> Hp Hq.
+    case Hle: (size p <= size q).
+    - left.
+      exists (drop (size p) q).
+      rewrite -{1}(cat_take_drop (size p) q).
+      have Htakep : p = take (size p) top.
+      { case: Hp=> rest ->. by rewrite take_size_cat. }
+      have Htakeq : take (size p) q = take (size p) top.
+      { case: Hq=> rest ->.
+        by rewrite (@takel_cat (size p) char q rest Hle). }
+      by rewrite Htakeq -Htakep.
+    - right.
+      have Hlt : size q < size p by rewrite ltnNge Hle.
+      have Hle' : size q <= size p := ltnW Hlt.
+      exists (drop (size q) p).
+      rewrite -{1}(cat_take_drop (size q) p).
+      have Htakeq : q = take (size q) top.
+      { case: Hq=> rest ->. by rewrite take_size_cat. }
+      have Htakep : take (size q) p = take (size q) top.
+      { case: Hp=> rest ->.
+        by rewrite (@takel_cat (size q) char p rest Hle'). }
+      by rewrite Htakep -Htakeq.
+  Qed.
+
+  Lemma prefix_of_rcons_cases p s a0 :
+    prefix_of p (rcons s a0) ->
+    prefix_of p s \/ p = rcons s a0.
+  Proof.
+    move=> Hp.
+    case Hle: (size p <= size s).
+    - left.
+      exact: prefix_of_comparable_by_size Hp (prefix_of_rcons s a0) Hle.
+    - right.
+      have Hlt : size s < size p by rewrite ltnNge Hle.
+      have Hupper := prefix_of_size p (rcons s a0) Hp.
+      rewrite size_rcons in Hupper.
+      have Heqsize : size p = size (rcons s a0).
+      { apply/eqP.
+        rewrite size_rcons eqn_leq Hupper.
+        exact Hlt. }
+      exact: (prefix_of_same_size p (rcons s a0) Hp Heqsize).
+  Qed.
+
+  Inductive interleaving_r : word -> word -> word -> Prop :=
+  | interleaving_r_nil : interleaving_r [::] [::] [::]
+  | interleaving_r_left u v w a0 :
+      interleaving_r u v w ->
+      interleaving_r (rcons u a0) v (rcons w a0)
+  | interleaving_r_right u v w b0 :
+      interleaving_r u v w ->
+      interleaving_r u (rcons v b0) (rcons w b0).
+
+  Lemma interleaving_r_prepend_left a0 u v w :
+    interleaving_r u v w ->
+    interleaving_r (a0 :: u) v (a0 :: w).
+  Proof.
+    elim=> [|u0 v0 w0 x _ IH|u0 v0 w0 x _ IH].
+    - exact: interleaving_r_left interleaving_r_nil.
+    - change (interleaving_r (rcons (a0 :: u0) x) v0
+        (rcons (a0 :: w0) x)).
+      exact: interleaving_r_left IH.
+    - change (interleaving_r (a0 :: u0) (rcons v0 x)
+        (rcons (a0 :: w0) x)).
+      exact: interleaving_r_right IH.
+  Qed.
+
+  Lemma interleaving_r_prepend_right b0 u v w :
+    interleaving_r u v w ->
+    interleaving_r u (b0 :: v) (b0 :: w).
+  Proof.
+    move=> Hint.
+    have Hsym : interleaving_r v u w.
+    { elim: Hint => [|u0 v0 w0 x _ IH|u0 v0 w0 x _ IH].
+      - exact: interleaving_r_nil.
+      - exact: interleaving_r_right IH.
+      - exact: interleaving_r_left IH. }
+    have := interleaving_r_prepend_left b0 v u w Hsym.
+    elim=> [|v0 u0 w0 x _ IH|v0 u0 w0 x _ IH].
+    - exact: interleaving_r_nil.
+    - exact: interleaving_r_right IH.
+    - exact: interleaving_r_left IH.
+  Qed.
+
+  Lemma interleaving_to_r u v w :
+    @interleaving char u v w -> interleaving_r u v w.
+  Proof.
+    elim=> [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH].
+    - elim: v0 => [|b0 v0 IH].
+      + exact: interleaving_r_nil.
+      + exact: interleaving_r_prepend_right IH.
+    - elim: u0 => [|a0 u0 IH].
+      + exact: interleaving_r_nil.
+      + exact: interleaving_r_prepend_left IH.
+    - exact: interleaving_r_prepend_left IH.
+    - exact: interleaving_r_prepend_right IH.
+  Qed.
+
+  Lemma pumping_preserves_mem u u' c :
+    @pumping char d0 u u' -> c \in u -> c \in u'.
+  Proof.
+    move=> Hpump Hmem.
+    have [p [s [x [Hu Hu' Hxp]]]] :=
+      @pumping_decompose char d0 u u' Hpump.
+    subst u u'.
+    rewrite mem_cat in Hmem.
+    move/orP: Hmem=> [Hp | Hs].
+    - rewrite mem_cat.
+      apply/orP. by left.
+    - rewrite mem_cat.
+      apply/orP. right.
+      by rewrite in_cons Hs orbT.
+  Qed.
+
+  Lemma seed_covers_mem seed out c :
+    @seed_covers char d0 seed out -> c \in seed -> c \in out.
+  Proof.
+    move=> Hcover.
+    elim: Hcover => [u Hu|u v _ IH Hpump] Hmem.
+    - by move/eqP: Hu=> ->.
+    - exact: pumping_preserves_mem Hpump (IH Hmem).
+  Qed.
+
+  Lemma seed_covers_append_seen seed out c :
+    @seed_covers char d0 seed out ->
+    c \in seed ->
+    @seed_covers char d0 seed (rcons out c).
+  Proof.
+    move=> Hcover Hcseed.
+    have Hcout := seed_covers_mem seed out c Hcover Hcseed.
+    have Hpump := @pumping_insert_char_after_prefix char d0 out [::] c Hcout.
+    rewrite cats0 cats1 in Hpump.
+    exact: (@pumping_closure_step char d0 (pred1 seed)
+      out (rcons out c) Hcover Hpump).
+  Qed.
+
+  Lemma seed_covers_extend seed out c :
+    @seed_covers char d0 seed out ->
+    @seed_covers char d0 (rcons seed c) (rcons out c).
+  Proof.
+    move=> Hcover.
+    elim: Hcover => [u Hu|u v _ IH Hpump].
+    - move/eqP: Hu=> Hu.
+      subst u.
+      exact: (@seed_covers_refl char d0 (rcons seed c)).
+    - have Hpump' := @pumping_cat_suffix char d0 u v [:: c] Hpump.
+      rewrite !cats1 in Hpump'.
+      exact: (@pumping_closure_step char d0 (pred1 (rcons seed c))
+        (rcons u c) (rcons v c) IH Hpump').
+  Qed.
+
+  Lemma comparable_prefix_interleaving_r_cover u v w :
+    interleaving_r u v w ->
+    (prefix_of u v -> @seed_covers char d0 v w) /\
+    (prefix_of v u -> @seed_covers char d0 u w).
+  Proof.
+    elim=> [|u0 v0 w0 a0 _ [IHuv IHvu]|u0 v0 w0 b0 _ [IHuv IHvu]].
+    - split=> _; exact: (@seed_covers_refl char d0 [::]).
+    - split.
+      + move=> Huv.
+        have Hu0v : prefix_of u0 v0.
+        { exact: prefix_of_trans u0 (rcons u0 a0) v0
+            (prefix_of_rcons u0 a0) Huv. }
+        apply: (seed_covers_append_seen v0 w0 a0 (IHuv Hu0v)).
+        apply: (prefix_of_mem (rcons u0 a0) v0 a0 Huv).
+        rewrite mem_rcons.
+        exact: mem_head.
+      + move=> Hvu.
+        case: (prefix_of_rcons_cases v0 u0 a0 Hvu)=> Hv0u.
+        * exact: seed_covers_extend u0 w0 a0 (IHvu Hv0u).
+        * subst v0.
+          have Hu0v : prefix_of u0 (rcons u0 a0) := prefix_of_rcons u0 a0.
+          apply: (seed_covers_append_seen (rcons u0 a0) w0 a0 (IHuv Hu0v)).
+          rewrite mem_rcons.
+          exact: mem_head.
+    - split.
+      + move=> Huv.
+        case: (prefix_of_rcons_cases u0 v0 b0 Huv)=> Hu0v.
+        * exact: seed_covers_extend v0 w0 b0 (IHuv Hu0v).
+        * subst u0.
+          have Hv0u : prefix_of v0 (rcons v0 b0) := prefix_of_rcons v0 b0.
+          apply: (seed_covers_append_seen (rcons v0 b0) w0 b0 (IHvu Hv0u)).
+          rewrite mem_rcons.
+          exact: mem_head.
+      + move=> Hvu.
+        have Hv0u : prefix_of v0 u0.
+        { exact: prefix_of_trans v0 (rcons v0 b0) u0
+            (prefix_of_rcons v0 b0) Hvu. }
+        apply: (seed_covers_append_seen u0 w0 b0 (IHvu Hv0u)).
+        apply: (prefix_of_mem (rcons v0 b0) u0 b0 Hvu).
+        rewrite mem_rcons.
+        exact: mem_head.
+  Qed.
+
+  Lemma comparable_prefix_interleaving_cover u v w :
+    prefix_of u v \/ prefix_of v u ->
+    @interleaving char u v w ->
+    (@seed_covers char d0 v w) \/ (@seed_covers char d0 u w).
+  Proof.
+    move=> Hcomp Hint.
+    have [Huv Hvu] := comparable_prefix_interleaving_r_cover
+      u v w (interleaving_to_r u v w Hint).
+    case: Hcomp=> Hpref.
+    - by left; exact: Huv Hpref.
+    - by right; exact: Hvu Hpref.
+  Qed.
+
+  Theorem prefix_include_base_shuffle_covered (L : dlang) :
+    prefix_include L -> @base_shuffle_covered char d0 L.
+  Proof.
+    move=> [top Htop Hall] u v w Hu Hv Hint.
+    have Hcomp := prefix_of_comparable u v top (Hall u Hu) (Hall v Hv).
+    case: (comparable_prefix_interleaving_cover u v w Hcomp Hint) => Hcover.
+    - by exists v.
+    - by exists u.
+  Qed.
+
+  Theorem prefix_include_pumping_closure_shuffle_closed (L : dlang) :
+    prefix_include L ->
+    @shuffle_closed char (@pumping_closure_lang char d0 L).
+  Proof.
+    move=> Hprefix.
+    apply: (proj1 (@base_shuffle_coveredP char d0 L)).
+    exact: prefix_include_base_shuffle_covered Hprefix.
+  Qed.
+
+  Lemma interleaving_mem c u v w :
+    @interleaving char u v w ->
+    c \in w -> c \in u \/ c \in v.
+  Proof.
+    move=> Hint.
+    elim: Hint => [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] //=.
+    - by right.
+    - by left.
+    - move/orP=> [/eqP -> | Hc].
+      + left. by rewrite in_cons eq_refl.
+      + case: (IH Hc)=> Hmem; [left | right] => //.
+        by rewrite in_cons Hmem orbT.
+    - move/orP=> [/eqP -> | Hc].
+      + right. by rewrite in_cons eq_refl.
+      + case: (IH Hc)=> Hmem; [left | right] => //.
+        by rewrite in_cons Hmem orbT.
+  Qed.
+
+  Lemma perm_word_mem s u c :
+    perm_word s u -> c \in s = (c \in u).
+  Proof.
+    move=> Hperm.
+    exact: (perm_mem Hperm c).
+  Qed.
+
   Lemma perm_word_count s u c :
     perm_word s u -> count_mem c s = count_mem c u.
   Proof.
     move/permP=> Hperm.
-    exact: Hperm.
+    exact: Hperm (pred1 c).
   Qed.
 
-  Lemma permall_seed_count_le s u c :
-    permall_seed s u ->
-    count_mem c u <= count_mem c s.
+  Lemma duplicate_decompose (c : char) (w : word) :
+    2 <= count_mem c w ->
+    exists p s,
+      w = p ++ c :: s /\ c \in p.
   Proof.
-    move=> [p [rest ->] Hperm].
-    rewrite -(perm_word_count p u c Hperm).
-    by rewrite count_cat leq_addr.
+    elim: w => [|a0 rest IH] //=.
+    case Hac: (a0 == c).
+    - move/eqP: Hac=> -> Hcount.
+      have Hmem : c \in rest.
+      { case Hmem: (c \in rest) => //.
+        have Hnot : c \notin rest by rewrite Hmem.
+        move/count_memPn: Hnot=> Hzero.
+        by rewrite Hzero in Hcount. }
+      case/splitPr: Hmem Hcount => p s Hcount.
+      exists (c :: p), s.
+      split.
+      + by [].
+      + by rewrite in_cons eq_refl.
+    - move=> Hcount.
+      have [p [s [Hrest Hcp]]] := IH Hcount.
+      exists (a0 :: p), s.
+      split.
+      + by rewrite Hrest.
+      + by rewrite in_cons Hcp orbT.
   Qed.
 
-  Lemma pump_semantic_count_ge X s out c :
-    @pump_semantic char X s out ->
-    count_mem c s <= count_mem c out.
+  Lemma count_strict_witness (need w : word) :
+    size need < size w ->
+    (forall c, count_mem c need <= count_mem c w) ->
+    exists c, count_mem c need < count_mem c w.
   Proof.
-    elim=> [Y|Y a0 rest block out0 _ _ IH] //=.
-    rewrite count_cat /= leq_add2l.
-    apply: leq_trans IH _.
-    by rewrite addnC leq_addr.
+    move=> Hsize Hcount.
+    case: (classic (exists c, count_mem c need < count_mem c w)) => // Hnone.
+    exfalso.
+    have Hrev : forall c, count_mem c w <= count_mem c need.
+    { move=> c; rewrite leqNgt.
+      apply/negP=> Hlt.
+      case: Hnone. by exists c. }
+    have [seed Hsub Hperm] :=
+      (proj1 (@count_subseqP char w need)) Hrev.
+    have Hle : size w <= size need.
+    { rewrite (perm_size Hperm).
+      exact: size_subseq Hsub. }
+    move: Hsize.
+    by rewrite ltnNge Hle.
   Qed.
 
-  Lemma pumping_closure_singleton_count_ge s out c :
-    @pumping_closure char d0 (pred1 s) out ->
-    count_mem c s <= count_mem c out.
+  Lemma multiset_seed_cover (need w : word) :
+    all (fun c => c \in need) w ->
+    (forall c, count_mem c need <= count_mem c w) ->
+    exists2 seed,
+      perm_word need seed & @seed_covers char d0 seed w.
   Proof.
-    move=> Hclos.
-    apply: pump_semantic_count_ge.
-    exact: (@pumping_closure_singleton_to_semantic char d0 s out Hclos).
+    move: need w.
+    pose P n := forall need w,
+      size w <= n ->
+      all (fun c => c \in need) w ->
+      (forall c, count_mem c need <= count_mem c w) ->
+      exists2 seed, perm_word need seed & @seed_covers char d0 seed w.
+    have HP : forall n, P n.
+    { elim=> [|n IH] need w Hwn Hall Hcount.
+      - have Hw0 : w = [::] by apply/eqP; rewrite -size_eq0 eqn_leq Hwn.
+        subst w.
+        have [seed Hsub Hperm] :=
+          (proj1 (@count_subseqP char need [::])) Hcount.
+        move: Hsub; rewrite subseq0 => /eqP Hseed.
+        subst seed.
+        exists [::].
+        + exact: Hperm.
+        + exact: (@seed_covers_refl char d0 [::]).
+      - have Hneed_le : size need <= size w.
+        { have [seed Hsub Hperm] :=
+            (proj1 (@count_subseqP char need w)) Hcount.
+          rewrite (perm_size Hperm).
+          exact: size_subseq Hsub. }
+        case Hsize: (size need == size w).
+        + move/eqP: Hsize=> Hsize.
+          have [seed Hsub Hperm] :=
+            (proj1 (@count_subseqP char need w)) Hcount.
+          have Hseed_size : size seed = size w.
+          { by rewrite -(perm_size Hperm). }
+          have Hseed_eq : seed = w.
+          { have Hleif := size_subseq_leqif Hsub.
+            rewrite Hseed_size in Hleif.
+            apply/eqP.
+            apply/(leqif_refl (size w)).
+            exact: Hleif. }
+          subst seed.
+          exists w => //.
+          exact: (@seed_covers_refl char d0 w).
+        + have Hlt : size need < size w.
+          { rewrite ltn_neqAle Hneed_le andbT.
+            apply/negP=> /eqP Heq.
+            move: Hsize. by rewrite Heq eq_refl. }
+          have [c Hc] := count_strict_witness need w Hlt Hcount.
+          have Hc_need : c \in need.
+          { have Hcw : c \in w.
+            { case Hmem: (c \in w) => //.
+              have Hnot : c \notin w by rewrite Hmem.
+              move/count_memPn: Hnot=> Hzero.
+              by rewrite Hzero in Hc. }
+            exact: allP Hall c Hcw. }
+          have Htwo : 2 <= count_mem c w.
+          { have Hpositive : 0 < count_mem c need.
+            { rewrite lt0n.
+              apply/eqP=> Hzero.
+              have Hnot : c \notin need.
+              { apply/count_memPn. exact: Hzero. }
+              by rewrite Hc_need in Hnot. }
+            exact: leq_ltn_trans Hpositive Hc. }
+          have [p [s [Hw Hcp]]] := duplicate_decompose c w Htwo.
+          pose w0 := p ++ s.
+          have Hw0_size : size w0 <= n.
+          { move: Hwn.
+            rewrite Hw /w0 !size_cat /= addnS.
+            by rewrite ltnS. }
+          have Hall0 : all (fun x => x \in need) w0.
+          { move: Hall.
+            rewrite Hw /w0 !all_cat /=.
+            by move/andP=> [Hp /andP [_ Hs]]; rewrite Hp Hs. }
+          have Hc0 : count_mem c need <= count_mem c p + count_mem c s.
+          { move: Hc.
+            rewrite Hw !count_cat /= eq_refl.
+            by rewrite addnS ltnS. }
+          have Hcount0 : forall x, count_mem x need <= count_mem x w0.
+          { move=> x.
+            case Hxc: (x == c).
+            - move/eqP: Hxc=> ->.
+              rewrite /w0 !count_cat.
+              exact: Hc0.
+            - have Heq : count_mem x w = count_mem x w0.
+              { by rewrite Hw /w0 !count_cat /= eq_sym Hxc. }
+              by rewrite -Heq. }
+          have [seed Hseed Hseedw0] :=
+            IH need w0 Hw0_size Hall0 Hcount0.
+          exists seed => //.
+          have Hpump := @pumping_insert_char_after_prefix char d0 p s c Hcp.
+          rewrite -/w0 in Hpump.
+          rewrite Hw.
+          exact: pumping_closure_step Hseedw0 Hpump. }
+    move=> need w Hall Hcount.
+    exact: (HP (size w) need w (leqnn _) Hall Hcount).
   Qed.
-End InterleavingSpecificAttempts.
-*)
+
+  Theorem permutation_collection_base_shuffle_covered
+      (L : dlang) (top : word) :
+    permutation_collection L top -> @base_shuffle_covered char d0 L.
+  Proof.
+    move=> Hcollection u v w Hu Hv Hint.
+    have [p Hp Hpu] := (proj1 (Hcollection u)) Hu.
+    have [q Hq Hqv] := (proj1 (Hcollection v)) Hv.
+    case: (prefix_of_comparable p q top Hp Hq) => Hpq.
+    - have Hall : all (fun c => c \in q) w.
+      { apply/allP=> c Hcw.
+        case: (interleaving_mem c u v w Hint Hcw)=> Hmem.
+        - have Hcp : c \in p.
+          { move: Hmem. by rewrite -(perm_word_mem p u c Hpu). }
+          exact: prefix_of_mem p q c Hpq Hcp.
+        - move: Hmem. by rewrite -(perm_word_mem q v c Hqv). }
+      have Hcount : forall c, count_mem c q <= count_mem c w.
+      { move=> c.
+        rewrite (interleaving_count_mem c u v w Hint).
+        rewrite (perm_word_count q v c Hqv).
+        by rewrite addnC leq_addr. }
+      have [seed Hqseed Hseedw] := multiset_seed_cover q w Hall Hcount.
+      exists seed.
+      + apply: (proj2 (Hcollection seed)).
+        by exists q.
+      + exact: Hseedw.
+    - have Hall : all (fun c => c \in p) w.
+      { apply/allP=> c Hcw.
+        case: (interleaving_mem c u v w Hint Hcw)=> Hmem.
+        - move: Hmem. by rewrite -(perm_word_mem p u c Hpu).
+        - have Hcq : c \in q.
+          { move: Hmem. by rewrite -(perm_word_mem q v c Hqv). }
+          exact: prefix_of_mem q p c Hpq Hcq. }
+      have Hcount : forall c, count_mem c p <= count_mem c w.
+      { move=> c.
+        rewrite (interleaving_count_mem c u v w Hint).
+        rewrite (perm_word_count p u c Hpu).
+        exact: leq_addr. }
+      have [seed Hpseed Hseedw] := multiset_seed_cover p w Hall Hcount.
+      exists seed.
+      + apply: (proj2 (Hcollection seed)).
+        by exists p.
+      + exact: Hseedw.
+  Qed.
+
+  Theorem permutation_collection_pumping_closure_shuffle_closed
+      (L : dlang) (top : word) :
+    permutation_collection L top ->
+    @shuffle_closed char (@pumping_closure_lang char d0 L).
+  Proof.
+    move=> Hcollection.
+    apply: (proj1 (@base_shuffle_coveredP char d0 L)).
+    exact: permutation_collection_base_shuffle_covered Hcollection.
+  Qed.
+
+End SpecialCases.

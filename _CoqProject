@@ -1,8 +1,43 @@
--Q . RegLang
-# -Q $(opam var lib)/coq/user-contrib/RegLang RegLang
+-Q . Accumulation
+-Q RegLang RegLang
 
-syntax.v
+RegLang/dfa.v
+RegLang/languages.v
+RegLang/minimization.v
+RegLang/misc.v
+RegLang/myhill_nerode.v
+RegLang/nfa.v
+RegLang/regexp.v
+RegLang/setoid_leq.v
+RegLang/shepherdson.v
+RegLang/two_way.v
+RegLang/vardi.v
+RegLang/wmso.v
+
 pumping.v
+trace_languages.v
+coverage.v
+coverage_simulation.v
+finite_shuffles.v
+certification.v
+protocols.v
+regular_protocols.v
+syntax.v
 semantics.v
 typestate.v
+invariants.v
 soundness.v
+regular_soundness.v
+copying_typestate.v
+copying_languages.v
+copying_soundness.v
+residual_certification.v
+copying_regular_soundness.v
+accumulation_bridge.v
+accumulation_integration.v
+examples.v
+certification_examples.v
+copying_examples.v
+residual_certification_examples.v
+accumulation_examples.v
+audit.v

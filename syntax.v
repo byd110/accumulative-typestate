@@ -1,172 +1,115 @@
-(* the basic syntax for checkol *)
+(* Programming-language syntax and finite maps. *)
+From Coq Require Import List Arith Bool Lia.
+Import ListNotations.
+Set Implicit Arguments.
+Definition var := nat.
+Definition loc := nat.
+Definition class := nat.
+Definition field := nat.
+Definition epoch := nat.
 
-Require Import String.
-Require Import Coq.Sets.Ensembles.
-From RecordUpdate Require Import RecordSet.
-From RecordUpdate Require Import RecordUpdate.
-From RegLang Require Import languages.
-Require Import ssreflect ssrfun ssrbool.
-From mathcomp Require Import all_ssreflect.
+(* Shadowing association lists; deletion is an explicit None entry. *)
+Definition fmap (V : Type) := list (nat * option V).
+Fixpoint get {V} (m : fmap V) (x : nat) : option V :=
+  match m with
+  | [] => None
+  | (y,v) :: rest => if Nat.eqb x y then v else get rest x
+  end.
+Definition put {V} (m : fmap V) (x : nat) (v : option V) := (x,v) :: m.
+Definition update {V} (f : nat -> V) x v :=
+  fun y => if Nat.eqb y x then v else f y.
+Lemma get_put_same {V} (m : fmap V) x v : get (put m x v) x = v.
+Proof. simpl; now rewrite Nat.eqb_refl. Qed.
+Lemma get_put_other {V} (m : fmap V) x y v :
+  y <> x -> get (put m x v) y = get m y.
+Proof. intros H; simpl. apply Nat.eqb_neq in H; now rewrite H. Qed.
+Lemma update_same {V} (f : nat -> V) x v : update f x v x = v.
+Proof. unfold update; now rewrite Nat.eqb_refl. Qed.
+Lemma update_other {V} (f : nat -> V) x y v :
+  y <> x -> update f x v y = f y.
+Proof. intros H; unfold update. apply Nat.eqb_neq in H; now rewrite H. Qed.
+Definition emptyb {V} (m : fmap V) :=
+  forallb (fun p => match get m (fst p) with None => true | Some _ => false end) m.
+Lemma get_some_key {V} (m : fmap V) x v :
+  get m x = Some v -> exists ov, In (x,ov) m.
+Proof.
+  induction m as [|[y ov] m IH]; simpl; [discriminate|].
+  destruct (x =? y) eqn:E.
+  - apply Nat.eqb_eq in E; subst; intros; exists ov; now left.
+  - intros H; destruct (IH H) as [ov' Hin]; exists ov'; now right.
+Qed.
+Lemma emptyb_spec {V} (m : fmap V) :
+  emptyb m = true <-> forall x, get m x = None.
+Proof.
+  unfold emptyb; rewrite forallb_forall; split.
+  - intros H x; destruct (get m x) as [v|] eqn:E; auto.
+    destruct (@get_some_key V m x v E) as [ov Hin].
+    specialize (H (x,ov) Hin); simpl in H; rewrite E in H; discriminate.
+  - intros H [x ov] Hin; simpl; now rewrite H.
+Qed.
 
-(* ------------------SYNTAX------------------*)
-Definition var : Type := nat.
-Definition method_name : Type := nat.
-Definition class_name : Type := nat.
+Inductive instruction (A : Type) :=
+| New (x : var) (c : class)
+| Copy (x y : var)
+| Load (x y : var) (f : field)
+| Store (x : var) (f : field) (y : var)
+| Call (x : var) (a : A)
+| Finish (x : var)
+Arguments New {A} _ _.
+Arguments Copy {A} _ _.
+Arguments Load {A} _ _ _.
+Arguments Store {A} _ _ _.
+Arguments Call {A} _ _.
+Arguments Finish {A} _.
+Inductive statement (A : Type) :=
+| Skip
+| Do (i : instruction A)
+| Seq (s t : statement A)
+| Branch (s t : statement A).
+Arguments Skip {A}.
+Arguments Do {A} _.
+Arguments Seq {A} _ _.
+Arguments Branch {A} _ _.
 
-(* Protocol *)
-Parameter char : eqType.
-Definition eps : word char := [::].
-Definition protocol : Type := dlang char.
+(* Both outcomes of a protocol-pure condition are checked. *)
+Fixpoint paths {A} (s : statement A) : list (list (instruction A)) :=
+  match s with
+  | Skip => [[]]
+  | Do i => [[i]]
+  | Seq s t => flat_map (fun p => map (fun q => p ++ q) (paths t)) (paths s)
+  | Branch s t => paths s ++ paths t
+  end.
+Inductive path {A} : statement A -> list (instruction A) -> Prop :=
+| path_skip : path Skip []
+| path_do i : path (Do i) [i]
+| path_seq s t p q : path s p -> path t q -> path (Seq s t) (p ++ q)
+| path_left s t p : path s p -> path (Branch s t) p
+| path_right s t q : path t q -> path (Branch s t) q.
+Lemma paths_spec {A} (s : statement A) p : In p (paths s) <-> path s p.
+Proof.
+  split.
+  - revert p; induction s; simpl; intros p H.
+    + destruct H as [<-|H]; [constructor|contradiction].
+    + destruct H as [<-|H]; [constructor|contradiction].
+    + apply in_flat_map in H; destruct H as [q [Hq H]].
+      apply in_map_iff in H; destruct H as [r [<- Hr]]. constructor; auto.
+    + apply in_app_or in H; destruct H; [apply path_left|apply path_right]; auto.
+  - intros H; induction H; simpl; auto.
+    + apply in_flat_map; exists p; split; auto. apply in_map; assumption.
+    + apply in_or_app; auto.
+    + apply in_or_app; auto.
+Qed.
 
-
-(* Definition r_a := { x : a | x = Assignable \/ x = Final}. *)
-
-(* Canonical projection for assignability *)
-(* Definition r_a_proj (x : r_a) : a := proj1_sig x. *)
-
-(* Qualified type  *)
-Record qualified_type := {
-  pi : protocol; (* Type qualifier *)
-  sctype: class_name; (* Class name *)
-}.
-
-Definition s_env := list qualified_type.
-
-Inductive expr : Type :=
-  | ENull : expr
-  | EVar : var -> expr
-  | EField : var -> var -> expr.
-
-Inductive stmt: Type :=
-  | SSkip: stmt (* skip *)
-  | SLocal: class_name -> var -> stmt (* T x*)
-  | SVarAss: var -> expr -> stmt (* x = e *)
-  | SFldWrite: var -> var -> var -> stmt (* x.f = y *)
-  | SNew: var -> class_name -> list var -> stmt (* x = new q_c C(y1, ..., yn) *)
-  | SCall: var -> var -> method_name -> list var -> stmt (* x = y.m(z1, ..., zn) *)
-  (* | SCast: var -> q -> class_name -> var -> stmt x = (q C) y  *)
-  | SSeq: stmt -> stmt -> stmt. (* s1; s2 *)
-
-Definition field_type : Type := class_name.
-
-(* Field declaration with assignability and mutability *)
-Record field_def := {
-  ftype : field_type; (* Field type *)
-  fname : var; (* Field name, the name should match the index from the field list *)
-}.
-
-Record constructor_body :={
-  super_call: list var; (* Super(f1, ..., fn)*)
-  assignments: list (var * var); (* this.f1 = f_1; ...; this.fn = f_n *)
-}.
-
-Record constructor_sig := {
-  sparams : list class_name; (* T x1, ..., T xn Parameters for super call *) (*s -> super*)
-  cparams : list class_name; (* T y1, ..., T yn Parameters for field assignment *) (*c -> current*)
-}.
-
-Record constructor_def := {
-  csignature : constructor_sig; (* Constructor signature *)
-  cbody : constructor_body; (* Constructor body *)
-}.
-
-Record method_body := {
-  mbody_stmt: stmt; (* Method body expression *)
-  mreturn: var; (* Return variable *)
-}.
-
-Record method_sig := {
-  mret : qualified_type; (* Return type *)
-  mname : method_name; (* Method name *)
-  mreceiver: class_name; (*T this*)
-  mparams : list class_name; (* T x1, ..., T xn *)
-}.
-
-Record method_def := {
-  msignature : method_sig; (* Method signature *)
-  mbody : method_body; (* Method body *)
-}.
-
-Record class_body := {
-  fields : list field_def; (* Class fields *)
-  constructor: constructor_def; (* Constructor declaration *)
-  methods : list method_def; (* Class methods *)
-}.
-
-Record class_sig := {
-  class_qualifier : protocol; (* Mutable, Immutable, or RDM *)
-  cname : class_name; (* Class name, need to be the same as the index from class_table *)
-  super : option class_name; (* Superclass name *)
-}.
-
-Record class_def := {
-  signature : class_sig; (* Class signature *)
-  body : class_body; (* Class body *)
-}.
-
-Record program_def := {
-  classes: list class_def; (* List of class declarations *)
-  main_statement: stmt; (* Main statement *)
-}.
-
-(* Class table is a list of class declarations *)
-Definition class_table := list class_def.
-
-(* ------------------RUNTIME MODEL------------------*)
-
-(* Initialization state *)
-(* Inductive init: Type := 
-  | initing
-  | inited. *)
-
-(* Runtime protocol *)
-Definition protocol_r : Type := dlang char.
-
-(* Runtime conformance check *)
-Definition Prot_conf (pi : protocol) : bool :=
-  eps \in pi.
-
-(* Static qualified type *)
-(* Runtime type *)
-Record runtime_type := mkruntime_type {
-  rqtype: protocol_r; (* Runtime mutability *)
-  rctype: class_name; (* Class name *)
-}.
-
-(* Memory address *)
-Definition Loc : Type := nat.
-
-(* Runtime value *)
-Inductive value : Type :=
-  | Null_a : value
-  | Iot: Loc -> value.
-
-(* Field mapping *)
-Definition fields_mapping := list value. 
-Definition var_mapping   := list value.
-
-Record r_env := mkr_env {
-  vars: var_mapping; (* Variable mapping *)
-  (* Initialization state *)
-  (* init_state: init; *)
-}.
-
-(* Runtime object *)
-Record Obj := mkObj {
-  rt_type: runtime_type; (* Runtime type *)
-  fields_map: fields_mapping; (* Field mapping *)
-}.
-
-Definition heap          := list Obj.
-
-(* AOSEN: just a test *)
-(* Instance settable_r_env : Settable _ :=
-  mkSettable (generate_setters mkr_env vars init_state). *)
-Record test := mktest {
-  abc: nat;
-  bcd: nat;
-}.
-
-Definition example_env := mktest 42 1.
-
-Definition updated_env := example_env <|abc := 100|>.
+(* Lookup current bindings, ignoring shadowed entries in the finite map. *)
+Definition liveb (r : fmap epoch) e :=
+  existsb (fun p => match get r (fst p) with
+     | Some d => Nat.eqb d e | None => false end) r.
+Lemma liveb_spec r e : liveb r e = true <-> exists x, get r x = Some e.
+Proof.
+  unfold liveb; rewrite existsb_exists; split.
+  - intros [[x v] [Hin E]]; simpl in E.
+    destruct (get r x) as [d|] eqn:Ex; try discriminate.
+    apply Nat.eqb_eq in E; subst; eauto.
+  - intros [x Ex]. destruct (@get_some_key epoch r x e Ex) as [v Hin].
+    exists (x,v); split; auto; simpl; rewrite Ex, Nat.eqb_refl; reflexivity.
+Qed.

@@ -1,0 +1,42 @@
+(* Recompiled by `make check`; these prints expose the theorem trust boundary. *)
+From Accumulation Require Import pumping coverage coverage_simulation certification invariants soundness regular_soundness copying_typestate copying_soundness residual_certification copying_regular_soundness.
+From Accumulation Require Import accumulation_bridge accumulation_integration accumulation_examples.
+Print Assumptions pumping_closure_singleton_correct.
+Print Assumptions pumping_normalize_correct.
+Print Assumptions pumping_closure_regular_regex.
+Print Assumptions base_shuffle_coveredP.
+Print Assumptions covers_spec.
+Print Assumptions covers_simulation_correct.
+Print Assumptions simulation_state_bound.
+Print Assumptions certify_regex_spec.
+Print Assumptions regex_counterexample_sound.
+Print Assumptions preservation.
+Print Assumptions typestate_prefix_sound.
+Print Assumptions typestate_completion_sound.
+Print Assumptions regular_program_prefix_sound.
+Print Assumptions regular_program_completion_sound.
+Print Assumptions fresh_program_unchanged.
+Print Assumptions certify_residuals_spec.
+Print Assumptions certify_copying_regex_spec.
+Print Assumptions copying_preservation.
+Print Assumptions copying_program_prefix_sound.
+Print Assumptions copying_program_completion_sound.
+Print Assumptions copying_regular_program_prefix_sound.
+Print Assumptions copying_regular_program_completion_sound.
+Print Assumptions kellogg_error_closed_iff_safe_extension.
+Print Assumptions kellogg_error_closed_iff_residual_prefix_shuffle_closed.
+Print Assumptions subsequence_safe_extension_iff_residual_prefix_shuffle_closed.
+Print Assumptions residual_shuffle_closed_kellogg_error_closed.
+Print Assumptions accumulation_contract_residual_shuffle_closed.
+Print Assumptions accumulation_contract_shuffle_closed.
+Print Assumptions kellogg_protocol_copying_certified.
+Print Assumptions observations_accumulate_iff_contract.
+Print Assumptions kellogg_regular_certificates.
+Print Assumptions kellogg_program_prefix_sound.
+Print Assumptions kellogg_program_completion_sound.
+Print Assumptions two_calls_accumulation_contract.
+Print Assumptions inherited_progress_sound_via_accumulation.
+Print Assumptions odd_unary_not_shuffle_closed.
+Print Assumptions gap_unary_residual_shuffle_closed.
+Print Assumptions gap_unary_not_completion_stable.
+Print Assumptions separating_protocol_not_accumulation_contract.

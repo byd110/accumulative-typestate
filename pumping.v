@@ -1,16 +1,10 @@
 (* definition for protocol and its compliance at language level *)
 
-Require Import RegLang.languages.
-Require Import RegLang.nfa RegLang.dfa.
-Require Import RegLang.regexp.
-
-Require Import String List.
-Require Import Coq.Logic.Classical.
-Import ListNotations.
-Open Scope string_scope.
-
 From mathcomp Require Import all_ssreflect.
-Require Import Coq.Strings.String.
+From RegLang Require Import languages dfa regexp.
+Require Import Coq.Logic.Classical.
+
+Set Default Proof Using "Type".
 
 Section FormalLanguage.
   (* Use types from RegLang/languages.v *)
@@ -36,7 +30,6 @@ Section FormalLanguage.
 End FormalLanguage.
 
 Section Pumping.
-  (* Placeholder for pumping word lemma or definitions *)
   (* Use types from RegLang/languages.v *)
   Variable char : finType.
   Definition word := word_base char.
@@ -46,14 +39,12 @@ Section Pumping.
   (* First, define pumping operation *)
   Variable d0 : char.
 
-  (* The way to interprete it: pumping w at position k with the letter at position i *)
+  (* Pump [w] at position [k] with the letter at position [i]. *)
   Definition pump_at (w : word) (k i : nat) : word :=
     take (k.+1) w ++ nth d0 w i :: drop (k.+1) w.
 
-    (* `has` is bool definition of exists. `has pred set`: exists x in set st. pred x = true *)
-    (* pumping is defined as: there exists a integer k in range [0, size w - 1], such that
-    k < size w, and there exists another i in range [0, k] such that w' is obtained by 
-    pumping w at position k with the letter at position i *)
+  (* [pumping w w'] holds when there are positions [k < size w] and
+     [i <= k] such that [w'] duplicates the letter at [i] after [k]. *)
   Definition pumping (w w' : word) : bool :=
     has (fun k =>
            (k < size w) &&
@@ -74,8 +65,8 @@ Section Pumping.
     apply/hasP. exists 1. by []. apply/andP. by [].
   Qed.
   
-  (* The closure is defined with two cases: 
-  1. the langauge L is in the closure,
+  (* The closure is defined with two cases:
+  1. the language L is in the closure,
   2. for any word in the closure, all the pumping word of that word are also in the closure *)
   Inductive pumping_closure (L : dlang) : lang :=
   | pumping_closure_base w :
@@ -107,6 +98,28 @@ Section Pumping.
         by move: i_in; rewrite mem_iota. 
         by rewrite eq_refl.
   Qed.
+
+  Lemma pump_succs_complete (u v : word) :
+    pumping u v -> v \in pump_succs u.
+  Proof.
+    rewrite /pumping.
+    move/hasP=> [k Hk].
+    move/andP=> [_ Hki].
+    move/hasP: Hki=> [i Hi].
+    move/andP=> [_ /eqP ->].
+    apply/flattenP.
+    exists [seq pump_at u k i0 | i0 <- iota 0 k.+1].
+    - by apply/mapP; exists k.
+    - by apply/mapP; exists i.
+  Qed.
+
+  Lemma pump_succsP (u v : word) :
+    reflect (pumping u v) (v \in pump_succs u).
+  Proof.
+    apply: (iffP idP).
+    - exact: pump_succs_sound.
+    - exact: pump_succs_complete.
+  Qed.
                 
   (* reachable is defining this transitive closure, i.e. either
   1. u == v, or
@@ -130,14 +143,7 @@ Section Pumping.
       (* m = 0: reachable 0 u v means u == v, so u = v. *)
       (* pumping v v' means pump_succs u contains v', so reachable 1 u v' *)
       move/eqP; move=> <- Hpump.
-      have : v' \in pump_succs u.
-      { rewrite /pump_succs. (* pumping v v' gives existence of k,i such that ... *)
-        (* we unfold pumping to expose the witness *)
-        rewrite /pumping in Hpump. move /hasP : Hpump => [k Hk].
-        move/andP => [Hk1 Hk2]. move/hasP : Hk2 => [i Hi].
-        move/andP => [Hi1 /eqP Hi2]. apply/flattenP. exists [seq pump_at u k i0  | i0 <- iota 0 k.+1].
-        apply/mapP. by exists k. apply/mapP. by exists i.
-      }
+      have : v' \in pump_succs u := pump_succs_complete _ _ Hpump.
       move => Hin //=. apply/hasP. by exists v'.
     (* m > 0: apply inductive hypothesis *)
     - move/hasP => [u1 Hu1] Hrec Hpump. have H1 := IH u1 v v' Hrec Hpump.
@@ -373,7 +379,7 @@ Section PumpingClosureRegularity.
     - by move=> _ [|x xs]; rewrite unfold_in /eps.
     - move=> _ w. rewrite unfold_in /atom.
       by case: w => [|x [|y ys]]; rewrite ?inE.
-    - move=> H. by case: H.
+    - by move=> /negP.
     - move/andP=> [Hr1 Hr2] w.
       by rewrite unfold_in /= /plus /= IH1 // IH2 // mem_cat.
     - move/andP=> [Hr1 Hr2] w.
@@ -945,7 +951,7 @@ Section PumpingClosureRegularity.
     have Hi_take : i < size (take k.+1 out).
     { have Hle : k.+1 <= size out by exact: Hk.
       have Hsize : size (take k.+1 out) = k.+1.
-      { rewrite size_take. by case: (minn_idPl Hle). }
+      { rewrite size_take. by apply/minn_idPl. }
       by rewrite Hsize ltnS. }
     have Hik' : i < k.+1 by rewrite ltnS.
     rewrite -(@nth_take k.+1 char d0 i Hik' out).
@@ -1625,9 +1631,6 @@ Section InterleavingClosedness.
       interleaving u v w ->
       covered_by S w.
 
-  Definition base_shuffle_covered (L : lang) :=
-    seed_shuffle_covered L.
-
   Definition seed_corpus (K : lang) (S : lang) :=
     forall w, K w <-> covered_by S w.
 
@@ -1734,8 +1737,8 @@ Section InterleavingClosedness.
     exact: seed_covers_trans Hseedz Hzw.
   Qed.
 
-  Theorem base_shuffle_coveredP (L : dlang) :
-    base_shuffle_covered L <->
+  Theorem seed_shuffle_coveredP (L : dlang) :
+    seed_shuffle_covered L <->
     shuffle_closed (pumping_closure_lang L).
   Proof.
     split.
@@ -2603,8 +2606,8 @@ Section SpecialCases.
     - by right; exact: Hvu Hpref.
   Qed.
 
-  Theorem prefix_include_base_shuffle_covered (L : dlang) :
-    prefix_include L -> @base_shuffle_covered char d0 L.
+  Theorem prefix_include_seed_shuffle_covered (L : dlang) :
+    prefix_include L -> @seed_shuffle_covered char d0 L.
   Proof.
     move=> [top Htop Hall] u v w Hu Hv Hint.
     have Hcomp := prefix_of_comparable u v top (Hall u Hu) (Hall v Hv).
@@ -2618,8 +2621,8 @@ Section SpecialCases.
     @shuffle_closed char (@pumping_closure_lang char d0 L).
   Proof.
     move=> Hprefix.
-    apply: (proj1 (@base_shuffle_coveredP char d0 L)).
-    exact: prefix_include_base_shuffle_covered Hprefix.
+    apply: (proj1 (@seed_shuffle_coveredP char d0 L)).
+    exact: prefix_include_seed_shuffle_covered Hprefix.
   Qed.
 
   Lemma interleaving_mem c u v w :
@@ -2798,9 +2801,9 @@ Section SpecialCases.
     exact: (HP (size w) need w (leqnn _) Hall Hcount).
   Qed.
 
-  Theorem permutation_collection_base_shuffle_covered
+  Theorem permutation_collection_seed_shuffle_covered
       (L : dlang) (top : word) :
-    permutation_collection L top -> @base_shuffle_covered char d0 L.
+    permutation_collection L top -> @seed_shuffle_covered char d0 L.
   Proof.
     move=> Hcollection u v w Hu Hv Hint.
     have [p Hp Hpu] := (proj1 (Hcollection u)) Hu.
@@ -2848,8 +2851,8 @@ Section SpecialCases.
     @shuffle_closed char (@pumping_closure_lang char d0 L).
   Proof.
     move=> Hcollection.
-    apply: (proj1 (@base_shuffle_coveredP char d0 L)).
-    exact: permutation_collection_base_shuffle_covered Hcollection.
+    apply: (proj1 (@seed_shuffle_coveredP char d0 L)).
+    exact: permutation_collection_seed_shuffle_covered Hcollection.
   Qed.
 
 End SpecialCases.

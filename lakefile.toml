@@ -1,0 +1,11 @@
+name = "typestate"
+version = "0.1.0"
+defaultTargets = ["Typestate"]
+
+[[lean_lib]]
+name = "Typestate"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.32.1"

@@ -1,12 +1,9 @@
 (* the basic syntax for checkol *)
 
-Require Import String.
-Require Import Coq.Sets.Ensembles.
-From RecordUpdate Require Import RecordSet.
-From RecordUpdate Require Import RecordUpdate.
-From RegLang Require Import languages.
-Require Import ssreflect ssrfun ssrbool.
 From mathcomp Require Import all_ssreflect.
+From RegLang Require Import languages.
+
+Set Default Proof Using "Type".
 
 (* ------------------SYNTAX------------------*)
 Definition var : Type := nat.
@@ -158,15 +155,3 @@ Record Obj := mkObj {
 }.
 
 Definition heap          := list Obj.
-
-(* AOSEN: just a test *)
-(* Instance settable_r_env : Settable _ :=
-  mkSettable (generate_setters mkr_env vars init_state). *)
-Record test := mktest {
-  abc: nat;
-  bcd: nat;
-}.
-
-Definition example_env := mktest 42 1.
-
-Definition updated_env := example_env <|abc := 100|>.

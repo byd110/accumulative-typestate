@@ -1,18 +1,35 @@
-(* Recompiled by `make check`; these prints expose the theorem trust boundary. *)
-From Accumulation Require Import pumping coverage coverage_simulation certification invariants soundness regular_soundness copying_typestate copying_soundness residual_certification copying_regular_soundness.
-From Accumulation Require Import accumulation_bridge accumulation_integration accumulation_examples.
+(* Recompiled by `make assumptions`; these prints expose the theorem trust boundary. *)
+From Accumulation Require Import pumping coverage coverage_simulation certification regular_protocols typestate invariants soundness regular_soundness copying_typestate copying_soundness residual_certification copying_regular_soundness.
+From Accumulation Require Import accumulation_bridge accumulation_integration accumulation_examples kellogg_separation.
+From Accumulation Require Import examples copying_examples necessity.
 Print Assumptions pumping_closure_singleton_correct.
+Print Assumptions pumping_closure_star_finite_basis.
+Print Assumptions eliminate_star_correct.
 Print Assumptions pumping_normalize_correct.
 Print Assumptions pumping_closure_regular_regex.
 Print Assumptions base_shuffle_coveredP.
+Print Assumptions seed_cover_interleaving_factor.
+Print Assumptions seed_shuffle_coveredP.
 Print Assumptions covers_spec.
 Print Assumptions covers_simulation_correct.
 Print Assumptions simulation_state_bound.
 Print Assumptions certify_regex_spec.
+Print Assumptions certify_seeds_spec.
 Print Assumptions regex_counterexample_sound.
+Print Assumptions regex_counterexample_none.
+Print Assumptions regex_counterexample_complete.
 Print Assumptions preservation.
+Print Assumptions check_step_sound.
+Print Assumptions check_step_complete.
+Print Assumptions check_trace_spec.
+Print Assumptions closure_regex_correct.
+Print Assumptions dfa_viable_spec.
+Print Assumptions regular_family_language.
+Print Assumptions regular_family_certified.
 Print Assumptions typestate_prefix_sound.
 Print Assumptions typestate_completion_sound.
+Print Assumptions completion_sound_requires_certified.
+Print Assumptions completion_sound_iff_certified.
 Print Assumptions regular_program_prefix_sound.
 Print Assumptions regular_program_completion_sound.
 Print Assumptions fresh_program_unchanged.
@@ -40,3 +57,19 @@ Print Assumptions odd_unary_not_shuffle_closed.
 Print Assumptions gap_unary_residual_shuffle_closed.
 Print Assumptions gap_unary_not_completion_stable.
 Print Assumptions separating_protocol_not_accumulation_contract.
+Print Assumptions separating_acb_not_viable.
+Print Assumptions separating_certified_not_kellogg.
+Print Assumptions separating_copy_accepted_without_certificate.
+Print Assumptions separating_copy_terminates.
+Print Assumptions separating_copy_actual_history.
+Print Assumptions separating_copy_actual_history_not_viable.
+Print Assumptions separating_copy_unsound_without_residual_certificate.
+Print Assumptions aliases_terminates.
+Print Assumptions aliases_object_history.
+Print Assumptions abandoned_object_accepted.
+Print Assumptions abandoned_object_terminates.
+Print Assumptions abandoned_object_unreachable.
+Print Assumptions abandoned_object_complete.
+Print Assumptions raw_invalid_call_executes.
+Print Assumptions inherited_progress_terminates.
+Print Assumptions inherited_progress_object_history.

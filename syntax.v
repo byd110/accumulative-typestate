@@ -54,7 +54,7 @@ Inductive instruction (A : Type) :=
 | Load (x y : var) (f : field)
 | Store (x : var) (f : field) (y : var)
 | Call (x : var) (a : A)
-| Finish (x : var)
+| Finish (x : var).
 Arguments New {A} _ _.
 Arguments Copy {A} _ _.
 Arguments Load {A} _ _ _.

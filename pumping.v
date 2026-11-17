@@ -36,7 +36,6 @@ Section FormalLanguage.
 End FormalLanguage.
 
 Section Pumping.
-  (* Placeholder for pumping word lemma or definitions *)
   (* Use types from RegLang/languages.v *)
   Variable char : finType.
   Definition word := word_base char.
@@ -1757,6 +1756,28 @@ Section InterleavingClosedness.
     exact: (@pumping_closure_base char d0 (pred1 s) s (eq_refl _)).
   Qed.
 
+  (* The paper's seed criterion also applies to arbitrary languages.  Using
+     originating seeds as the closure representation avoids a decidability
+     assumption on S; pumping_closure_seed_corpus relates this representation
+     to the inductive closure for Boolean-valued seed languages. *)
+  Theorem seed_shuffle_coveredP (S : lang) :
+    seed_shuffle_covered S <-> shuffle_closed (covered_by S).
+  Proof.
+    split.
+    - move=> H u v w [su Hsu Hsuu] [sv Hsv Hsvv] Hint.
+      have [z [Hz Hzw]] := seed_cover_interleaving_factor su sv u v w
+        Hsuu Hsvv Hint.
+      have [seed Hseed Hseedz] := H su sv z Hsu Hsv Hz.
+      exists seed => //.
+      exact: seed_covers_trans Hseedz Hzw.
+    - move=> H u v w Hu Hv Hint.
+      have Hu' : covered_by S u.
+      { exists u => //; exact: seed_covers_refl. }
+      have Hv' : covered_by S v.
+      { exists v => //; exact: seed_covers_refl. }
+      exact: (H u v w Hu' Hv' Hint).
+  Qed.
+
   Lemma seed_covers_size_ge s w :
     seed_covers s w -> size s <= size w.
   Proof.
@@ -2294,190 +2315,3 @@ Section InterleavingClosedness.
   Proof. exact: interleaving_nil_r. Qed.
 
 End InterleavingClosedness.
-
-(*
-Section InterleavingSpecificAttempts.
-  Variable char : finType.
-  Notation word := (RegLang.languages.word char).
-  Notation lang := (RegLang.languages.lang char).
-  Notation dlang := (RegLang.languages.dlang char).
-
-  Variable d0 : char.
-
-  Definition shuffle_closed (L : lang) :=
-    forall u v w,
-      L u -> L v -> @interleaving char u v w -> L w.
-
-  Definition prefix_of (p s : word) :=
-    exists t, s = p ++ t.
-
-  Definition prefix_include (L : dlang) :=
-    exists2 s, L s & forall u, L u -> prefix_of u s.
-
-  Definition singleton_reseeding_complete (L : dlang) :=
-    forall seed1 seed2 out1 out2 out,
-      L seed1 ->
-      L seed2 ->
-      @pumping_closure char d0 (pred1 seed1) out1 ->
-      @pumping_closure char d0 (pred1 seed2) out2 ->
-      @interleaving char out1 out2 out ->
-      exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
-
-  Definition comparable_reseeding_complete (L : dlang) :=
-    forall seed1 seed2 out1 out2 out,
-      L seed1 ->
-      L seed2 ->
-      prefix_of seed1 seed2 \/ prefix_of seed2 seed1 ->
-      @pumping_closure char d0 (pred1 seed1) out1 ->
-      @pumping_closure char d0 (pred1 seed2) out2 ->
-      @interleaving char out1 out2 out ->
-      exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
-
-  Lemma pumping_closure_origin (L : dlang) out :
-    @pumping_closure char d0 L out ->
-    exists2 seed, L seed & @pumping_closure char d0 (pred1 seed) out.
-  Proof.
-    move=> Hclos.
-    elim: Hclos => [u Hu | u v _ [seed Hseed Hseedu] Hpump].
-    - exists u => //.
-      exact: (@pumping_closure_base char d0 (pred1 u) u (eq_refl _)).
-    - exists seed => //.
-      exact: pumping_closure_step Hseedu Hpump.
-  Qed.
-
-  Theorem reseeding_complete_pumping_closure_shuffle_closed (L : dlang) :
-    singleton_reseeding_complete L ->
-    shuffle_closed (fun out => @pumping_closure char d0 L out).
-  Proof.
-    move=> Hreseed out1 out2 out Hout1 Hout2 Hint.
-    case: (pumping_closure_origin L out1 Hout1) => seed1 Hseed1 Hseed1out.
-    case: (pumping_closure_origin L out2 Hout2) => seed2 Hseed2 Hseed2out.
-    case: (Hreseed seed1 seed2 out1 out2 out
-             Hseed1 Hseed2 Hseed1out Hseed2out Hint)
-      => seed Hseed Hseedout.
-    exact: (@pumping_closure_lift_singleton char d0 L seed out Hseed Hseedout).
-  Qed.
-
-  Lemma prefix_of_take p s :
-    prefix_of p s -> p = take (size p) s.
-  Proof.
-    move=> [t ->].
-    by rewrite take_size_cat.
-  Qed.
-
-  Lemma prefix_of_comparable_by_size p q s :
-    prefix_of p s ->
-    prefix_of q s ->
-    size p <= size q ->
-    prefix_of p q.
-  Proof.
-    move=> [prest ->] [qrest Hq] Hsize.
-    exists (drop (size p) q).
-    rewrite -{1}(cat_take_drop (size p) q).
-    have Htake : p = take (size p) q.
-    { have Heq := congr1 (take (size p)) Hq.
-      move: Heq.
-      rewrite take_size_cat //.
-      rewrite (@takel_cat (size p) char q qrest Hsize).
-      by []. }
-    by rewrite -Htake.
-  Qed.
-
-  Lemma prefix_include_seeds_comparable (L : dlang) seed1 seed2 :
-    prefix_include L ->
-    L seed1 ->
-    L seed2 ->
-    prefix_of seed1 seed2 \/ prefix_of seed2 seed1.
-  Proof.
-    move=> [top Htop Hall] Hseed1 Hseed2.
-    have Hpref1 : prefix_of seed1 top := Hall seed1 Hseed1.
-    have Hpref2 : prefix_of seed2 top := Hall seed2 Hseed2.
-    case Hle: (size seed1 <= size seed2).
-    - left. exact: (prefix_of_comparable_by_size seed1 seed2 top Hpref1 Hpref2 Hle).
-    - right.
-      have Hlt : size seed2 < size seed1 by rewrite ltnNge Hle.
-      have Hle' : size seed2 <= size seed1 := ltnW Hlt.
-      exact: (prefix_of_comparable_by_size seed2 seed1 top Hpref2 Hpref1 Hle').
-  Qed.
-
-  Theorem prefix_include_pumping_closure_shuffle_closed_from_comparable_reseeding
-      (L : dlang) :
-    prefix_include L ->
-    comparable_reseeding_complete L ->
-    shuffle_closed (fun out => @pumping_closure char d0 L out).
-  Proof.
-    move=> Hprefix Hreseed.
-    apply: reseeding_complete_pumping_closure_shuffle_closed.
-    move=> seed1 seed2 out1 out2 out Hseed1 Hseed2 Hout1 Hout2 Hint.
-    apply: Hreseed Hout1 Hout2 Hint.
-    - exact: Hseed1.
-    - exact: Hseed2.
-    - exact: prefix_include_seeds_comparable Hprefix Hseed1 Hseed2.
-  Qed.
-
-  Definition perm_word (s u : word) :=
-    perm_eq s u.
-
-  Definition permall_seed (s u : word) :=
-    exists2 p, prefix_of p s & perm_word p u.
-
-  Definition perm_suffix_seed (s t u : word) :=
-    exists2 p, perm_word s p & u = p ++ t.
-
-  Definition permutation_extended (L : dlang) (s t : word) :=
-    forall u, L u <-> permall_seed s u \/ perm_suffix_seed s t u.
-
-  Lemma interleaving_size u v w :
-    @interleaving char u v w -> size w = size u + size v.
-  Proof.
-    elim=> [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] /=;
-      by rewrite ?add0n ?addn0 ?IH ?addnS.
-  Qed.
-
-  Lemma interleaving_count_mem c u v w :
-    @interleaving char u v w ->
-    count_mem c w = count_mem c u + count_mem c v.
-  Proof.
-    elim=> [v0|u0|a0 u0 v0 w0 _ IH|b0 u0 v0 w0 _ IH] /=.
-    - by [].
-    - by rewrite addn0.
-    - by rewrite IH addnA.
-    - by rewrite IH addnCA.
-  Qed.
-
-  Lemma perm_word_count s u c :
-    perm_word s u -> count_mem c s = count_mem c u.
-  Proof.
-    move/permP=> Hperm.
-    exact: Hperm.
-  Qed.
-
-  Lemma permall_seed_count_le s u c :
-    permall_seed s u ->
-    count_mem c u <= count_mem c s.
-  Proof.
-    move=> [p [rest ->] Hperm].
-    rewrite -(perm_word_count p u c Hperm).
-    by rewrite count_cat leq_addr.
-  Qed.
-
-  Lemma pump_semantic_count_ge X s out c :
-    @pump_semantic char X s out ->
-    count_mem c s <= count_mem c out.
-  Proof.
-    elim=> [Y|Y a0 rest block out0 _ _ IH] //=.
-    rewrite count_cat /= leq_add2l.
-    apply: leq_trans IH _.
-    by rewrite addnC leq_addr.
-  Qed.
-
-  Lemma pumping_closure_singleton_count_ge s out c :
-    @pumping_closure char d0 (pred1 s) out ->
-    count_mem c s <= count_mem c out.
-  Proof.
-    move=> Hclos.
-    apply: pump_semantic_count_ge.
-    exact: (@pumping_closure_singleton_to_semantic char d0 s out Hclos).
-  Qed.
-End InterleavingSpecificAttempts.
-*)

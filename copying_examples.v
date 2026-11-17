@@ -36,6 +36,27 @@ Proof.
   eapply copying_program_completion_sound.
   apply two_calls_copying_certified. exact inherited_progress_accepted.
 Qed.
+
+(* Both views finish at [true; true], whereas the actual shared history has
+   three events.  Inherited evidence is not a second operational event. *)
+Definition inherited_progress_final : machine bool :=
+  let m := allocate initial_machine 0 0 in
+  let m := emit m 0 true in
+  let m := bind m 1 0 in
+  let m := emit m 0 true in
+  let m := emit m 1 true in
+  let m := retire m 0 in
+  retire m 1.
+Example inherited_progress_terminates :
+  program_execution inherited_progress initial_machine inherited_progress_final.
+Proof.
+  apply block_execution. unfold inherited_progress_final.
+  repeat (eapply execution_cons; [econstructor; reflexivity|]); constructor.
+Qed.
+Example inherited_progress_object_history :
+  next_loc inherited_progress_final = 1 /\
+  object_history inherited_progress_final 0 = [true; true; true].
+Proof. vm_compute; auto. Qed.
 Example nested_copies_accepted : check_program_with_copy two_calls fields copy_all
   (block [New 0 0; Call 0 true; Copy 1 0; Copy 2 1;
           Call 0 true; Call 1 true; Call 2 true; Finish 0; Finish 1; Finish 2]) = true.

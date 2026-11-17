@@ -40,6 +40,15 @@ Qed.
 Definition fields (c : class) (_ : field) := c.
 Fixpoint block (is : list (instruction bool)) : statement bool :=
   match is with [] => Skip | i::rest => Seq (Do i) (block rest) end.
+Lemma block_path is : path (block is) is.
+Proof.
+  induction is as [|i is IH]; simpl; [constructor|].
+  change (path (Seq (Do i) (block is)) ([i] ++ is)).
+  constructor; [constructor|exact IH].
+Qed.
+Lemma block_execution is m m' : execution is m m' ->
+  program_execution (block is) m m'.
+Proof. intros H; exists is; split; [apply block_path|exact H]. Qed.
 Definition aliases := block [New 0 0; Copy 1 0; Call 0 true; Call 1 true;
                             Call 0 true; Finish 0; Call 1 true; Finish 1].
 Example aliases_accepted : check_program two_calls fields aliases = true.
@@ -83,3 +92,82 @@ Example completed_branches_accepted : check_program two_calls fields
     (block [Call 0 true; Call 0 true; Finish 0])
     (block [Call 0 true; Call 0 true; Call 0 true; Finish 0]))) = true.
 Proof. vm_compute; reflexivity. Qed.
+
+(* Explicit executions rule out vacuity of the soundness examples.  The
+   protocol excludes false and requires two calls, so neither acceptance nor
+   completion is trivial.  These machines are built only by the raw steps. *)
+Definition aliases_final : machine bool :=
+  let m := allocate initial_machine 0 0 in
+  let m := bind m 1 0 in
+  let m := emit m 0 true in
+  let m := emit m 1 true in
+  let m := emit m 0 true in
+  let m := retire m 0 in
+  let m := emit m 1 true in
+  retire m 1.
+Example aliases_terminates : program_execution aliases initial_machine aliases_final.
+Proof.
+  apply block_execution. unfold aliases_final.
+  repeat (eapply execution_cons; [econstructor; reflexivity|]); constructor.
+Qed.
+Example aliases_object_history : next_loc aliases_final = 1 /\
+  object_history aliases_final 0 = [true; true; true; true].
+Proof. vm_compute; auto. Qed.
+
+(* Overwriting drops the last reference to location 0, but its completed
+   history remains in the theorem's domain after location 1 is allocated. *)
+Definition abandoned_object := block
+  [New 0 0; Call 0 true; Call 0 true; New 0 0;
+   Call 0 true; Call 0 true; Finish 0].
+Definition abandoned_object_final : machine bool :=
+  let m := allocate initial_machine 0 0 in
+  let m := emit m 0 true in
+  let m := emit m 0 true in
+  let m := allocate m 0 0 in
+  let m := emit m 1 true in
+  let m := emit m 1 true in
+  retire m 0.
+Example abandoned_object_accepted :
+  check_program two_calls fields abandoned_object = true.
+Proof. vm_compute; reflexivity. Qed.
+Example abandoned_object_terminates :
+  program_execution abandoned_object initial_machine abandoned_object_final.
+Proof.
+  apply block_execution. unfold abandoned_object_final.
+  repeat (eapply execution_cons; [econstructor; reflexivity|]); constructor.
+Qed.
+Example abandoned_object_unreachable :
+  next_loc abandoned_object_final = 2 /\
+  object_history abandoned_object_final 0 = [true; true] /\
+  (forall x, reference abandoned_object_final x = None) /\
+  (forall l f, heap abandoned_object_final l f = None).
+Proof.
+  split; [reflexivity|]. split; [reflexivity|]. split.
+  - intros [|x]; reflexivity.
+  - reflexivity.
+Qed.
+Example abandoned_object_complete :
+  protocol two_calls (classes abandoned_object_final 0)
+    (object_history abandoned_object_final 0).
+Proof.
+  eapply typestate_completion_sound with (FT := fields).
+  - apply two_calls_certified.
+  - apply abandoned_object_accepted.
+  - apply abandoned_object_terminates.
+  - simpl; lia.
+Qed.
+
+(* The operational semantics permits the very error excluded by checking;
+   it does not hide invalid calls behind a protocol-monitor premise. *)
+Example raw_invalid_call_executes :
+  exists m, program_execution (block [New 0 0; Call 0 false]) initial_machine m /\
+    next_loc m = 1 /\
+    ~ prefix_language (protocol two_calls (classes m 0)) (object_history m 0).
+Proof.
+  exists (emit (allocate initial_machine 0 0) 0 false). split.
+  - apply block_execution.
+    eapply execution_cons; [constructor|].
+    eapply execution_cons; [econstructor; reflexivity|constructor].
+  - split; [reflexivity|]. intros H.
+    apply viable_prefix in H. discriminate.
+Qed.

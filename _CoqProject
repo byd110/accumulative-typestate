@@ -27,6 +27,7 @@ semantics.v
 typestate.v
 invariants.v
 soundness.v
+necessity.v
 regular_soundness.v
 copying_typestate.v
 copying_languages.v
@@ -40,4 +41,5 @@ certification_examples.v
 copying_examples.v
 residual_certification_examples.v
 accumulation_examples.v
+kellogg_separation.v
 audit.v

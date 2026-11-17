@@ -153,6 +153,19 @@ Proof.
 Qed.
 
 Definition regex_counterexample (r : regexp A) := counterexample (normalized_seeds r).
+Theorem regex_counterexample_none r :
+  regex_counterexample r = None <-> certify_regex r = true.
+Proof. unfold regex_counterexample, certify_regex; apply counterexample_none. Qed.
+
+Theorem regex_counterexample_complete r : certify_regex r = false ->
+  exists u v w, regex_counterexample r = Some (u,v,w).
+Proof.
+  intros Hreject.
+  destruct (regex_counterexample r) as [[[u v] w]|] eqn:E.
+  - exists u, v, w; reflexivity.
+  - apply regex_counterexample_none in E; congruence.
+Qed.
+
 Theorem regex_counterexample_sound r u v w : regex_counterexample r = Some (u,v,w) ->
   @pumping_closure A default (regex_lang A r) u /\
   @pumping_closure A default (regex_lang A r) v /\

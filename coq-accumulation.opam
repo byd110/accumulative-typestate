@@ -1,0 +1,18 @@
+opam-version: "2.0"
+synopsis: "Pumping protocols and alias-oblivious typestate proofs"
+maintainer: "Yudi Bai <yudi.bai@uwaterloo.ca>"
+authors: ["Yudi Bai" "Arie Gurfinkel" "Werner Dietl"]
+homepage: "https://github.com/byd110/accumulative-typestate"
+bug-reports: "https://github.com/byd110/accumulative-typestate/issues"
+description: """
+Reproduce the Rocq artifact's language constructions, exact certificates,
+and client safety and completion proofs. RegLang sources are bundled.
+"""
+depends: [
+  "ocaml" {= "4.14.2"}
+  "coq" {= "8.20.0"}
+  "coq-mathcomp-ssreflect" {= "2.3.0"}
+  "coq-hierarchy-builder" {= "1.10.1"}
+]
+build: [make "-j%{jobs}%"]
+run-test: [make "check"]

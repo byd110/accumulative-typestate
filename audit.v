@@ -2,6 +2,7 @@
 From Accumulation Require Import pumping coverage coverage_simulation certification regular_protocols typestate invariants soundness regular_soundness copying_typestate copying_soundness residual_certification copying_regular_soundness.
 From Accumulation Require Import accumulation_bridge accumulation_integration accumulation_examples kellogg_separation.
 From Accumulation Require Import examples copying_examples necessity.
+From Accumulation Require Import runtime_monitor runtime_monitor_examples.
 Print Assumptions pumping_closure_singleton_correct.
 Print Assumptions pumping_closure_star_finite_basis.
 Print Assumptions eliminate_star_correct.
@@ -73,3 +74,20 @@ Print Assumptions abandoned_object_complete.
 Print Assumptions raw_invalid_call_executes.
 Print Assumptions inherited_progress_terminates.
 Print Assumptions inherited_progress_object_history.
+Print Assumptions runtime_call_guard.
+Print Assumptions runtime_exit_check_spec.
+Print Assumptions runtime_exit_check_retire.
+Print Assumptions raw_contract_monitor_no_error.
+Print Assumptions raw_contract_monitor_equivalence.
+Print Assumptions baseline_runtime_no_error.
+Print Assumptions baseline_runtime_equivalence.
+Print Assumptions copying_runtime_no_error.
+Print Assumptions copying_runtime_equivalence.
+Print Assumptions empty_protocol_allocation_errors.
+Print Assumptions invalid_call_monitor_errors.
+Print Assumptions incomplete_retired_object_program_errors.
+Print Assumptions individual_finish_allows_other_incomplete_object.
+Print Assumptions staggered_retirement_monitor_succeeds.
+Print Assumptions aliases_monitor_succeeds.
+Print Assumptions abandoned_object_monitor_succeeds.
+Print Assumptions inherited_progress_monitor_succeeds.

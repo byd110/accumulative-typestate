@@ -9,7 +9,7 @@ all: Makefile.coq
 	+$(MAKE) -f Makefile.coq all
 
 check: all check-sources
-	coqchk -silent -Q . Accumulation -Q RegLang RegLang Accumulation.audit Accumulation.examples Accumulation.certification_examples Accumulation.copying_examples Accumulation.residual_certification_examples Accumulation.accumulation_examples
+	coqchk -silent -Q . Accumulation -Q RegLang RegLang Accumulation.audit Accumulation.examples Accumulation.certification_examples Accumulation.copying_examples Accumulation.residual_certification_examples Accumulation.accumulation_examples Accumulation.runtime_monitor_examples
 
 check-sources:
 	python3 check_sources.py

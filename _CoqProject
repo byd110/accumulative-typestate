@@ -32,6 +32,8 @@ regular_soundness.v
 copying_typestate.v
 copying_languages.v
 copying_soundness.v
+monitor_shape.v
+runtime_monitor.v
 residual_certification.v
 copying_regular_soundness.v
 accumulation_bridge.v
@@ -42,4 +44,5 @@ copying_examples.v
 residual_certification_examples.v
 accumulation_examples.v
 kellogg_separation.v
+runtime_monitor_examples.v
 audit.v

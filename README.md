@@ -43,9 +43,11 @@ make clean       # remove generated proof artifacts
 ```
 
 For a clean verification, run `make clean` first, then the three build/check
-commands. Each must exit with status zero. `make check` checks all 41 listed
+commands. Each must exit with status zero. `make check` checks all 44 listed
 sources and kernel-checks the audit/example dependency closure. `make assumptions`
-prints 71 reports, each expected to say `Closed under the global context`.
+prints 88 reports, each expected to say `Closed under the global context`.
+The 32 project sources contain 2,556 specification lines and 3,146 proof lines
+(5,702 total by `coqwc *.v`), excluding the 12 bundled RegLang sources and comments.
 
 `_CoqProject` maps project modules to `Accumulation` and the bundled library to
 `RegLang`. Coq reports an overlapping-loadpath warning because the latter is a
@@ -70,11 +72,12 @@ certification and typestate results do not depend on that argument.
 | Finite certification | `finite_shuffles.v`: complete shuffle enumeration. `certification.v`: Boolean seed/regex certification iff shuffle closedness, and checked rejection witnesses. |
 | Decidable protocols | `protocols.v`: verified completion/viability interface. `regular_protocols.v`: explicit closure regex and an implementation using normalized-seed coverage for membership and DFA residual inhabitation for viability. |
 | Programming language | `syntax.v`: instructions, statements, finite maps, path enumeration. `semantics.v`: allocation, copy, heap load/store, calls, finish, and execution. |
+| Runtime protocol checks | `monitor_shape.v`: raw references and heap targets denote allocated locations. `runtime_monitor.v`: explicit protocol-error outcomes, object-history call checks, allocation viability, all-object completion at program exit, and raw/monitored equivalence for accepted baseline and copying programs. |
 | Typestate system | `typestate.v`: per-reference residuals, declarative rules, executable checker, equivalence, and universal branch checking. |
 | Metatheory | `invariants.v`: binding epochs, heap/class agreement, retired obligations, and preservation. `soundness.v`: prefix safety and all-object completion. `necessity.v`: completion soundness of the baseline core checker iff every class protocol is shuffle closed. `regular_soundness.v`: finite class-table certification composed with the client checker. |
 | Optional history copying | `copying_typestate.v`: per-class mode and exact recovery of the original checker. `copying_languages.v`, `copying_soundness.v`: completion-continuation invariant and safety for the existing raw semantics. `residual_certification.v`: exact finite DFA certificate. `copying_regular_soundness.v`: certified regular-seed integration. |
 | Accumulation relationship | `accumulation_bridge.v`: first-error subsequence law, exact safety/residual-shuffle correspondence, and sufficient completion contract. `accumulation_integration.v`: observation interpretation, existing finite certificates, and client-soundness consequences. `accumulation_examples.v`: an inhabited contract and separating examples. `kellogg_separation.v`: the first-error separation and a concrete unsafe client when copying lacks its certificate. |
-| Verification | `examples.v`, `certification_examples.v`, `copying_examples.v`, `residual_certification_examples.v`, `audit.v`, and `check_sources.py`. |
+| Verification | `examples.v`, `certification_examples.v`, `copying_examples.v`, `residual_certification_examples.v`, `accumulation_examples.v`, `runtime_monitor_examples.v`, `audit.v`, and `check_sources.py`. |
 
 The [bundled-library notice](RegLang/README.md) records RegLang's provenance,
 known differences from upstream, and [CeCILL-B license](RegLang/LICENSE).
@@ -100,7 +103,14 @@ known differences from upstream, and [CeCILL-B license](RegLang/LICENSE).
 - `typestate_prefix_sound` / `typestate_completion_sound`: accepted programs are
   safe at every executable prefix and complete on termination, for every
   allocated object, including unreachable objects.
-- `completion_sound_iff_certified`: completion soundness of this baseline core
+- `baseline_runtime_no_error` / `copying_runtime_no_error`: accepted programs
+  cannot produce the explicit `ProtocolError` outcome, under the respective
+  protocol certificates.
+- `baseline_runtime_equivalence` / `copying_runtime_equivalence`: accepted
+  programs have exactly the same successful final states in raw and monitored
+  execution. The raw-to-monitored direction establishes that guards do not
+  remove accepted executions; error freedom is not obtained by assuming guards.
+- `completion_sound_iff_certified`: raw completion soundness of this baseline core
   checker is equivalent to shuffle closedness of every class protocol. The
   converse realizes any two complete histories and their chosen interleaving
   by an accepted, terminating two-alias client.
@@ -113,6 +123,34 @@ For concrete executions, inspect `aliases_terminates`,
 including an unreachable allocated object and overlapping inherited views.
 `raw_invalid_call_executes` shows that the operational semantics permits a
 protocol-invalid call: safety is a theorem about accepted programs.
+The corresponding monitored execution reports `ProtocolError`, as shown by
+`invalid_call_monitor_errors`. `runtime_monitor_examples.v` also checks invalid
+allocation, incomplete exit for an unreachable object, staggered retirement of
+two objects, and successful baseline and inherited-history executions.
+
+### Runtime checks and the program boundary
+
+`runtime_monitor.v` keeps the raw operations unchanged and adds protocol checks
+with explicit success and error outcomes. Allocation requires a viable empty
+history. A call checks the updated aggregate history of its receiver object;
+`runtime_call_guard` equates that test to viability of the old history followed
+by the called event. Copying, loads, stores, and individual `Finish x` retirements
+do not alter object histories and have no additional protocol guard.
+
+At the end of the selected program path, `runtime_exit_check` checks acceptance
+of every allocated object's history, including unreachable objects. This is a
+single program-boundary check, not a check at each recursive trace suffix or
+individual retirement. `runtime_exit_check_retire` proves that retirement leaves
+this aggregate test unchanged. The static checker still checks each binding's
+completion when it retires, which is a stronger sufficient discipline.
+
+The new monitor is formalized over the existing core. It does not supply the
+separate translation from paper-level bulk `finish`, automatic exit insertion,
+regular-expression-valued environments, and environment sets to this core's
+individual retirements, word histories, and paths. The core final guard matches
+the paper's all-object completion predicate; the full surface translation remains
+an explicit boundary. As before, undefined reference/field accesses have no raw
+step and are not reclassified as protocol errors or proved impossible here.
 
 ## Relationship to Accumulation Analysis
 
@@ -227,9 +265,11 @@ partition invariant for inherited views while preserving the raw semantics.
 Completing through one alias still does not discharge another alias's local
 obligation, which can cause false positives.
 
-The runtime carries ghost epoch tags to state the history-partition invariant.
-Operational calls have **no protocol premise**. The soundness theorem proves
-protocol membership from the checker. It does not assume it in execution.
+The raw runtime carries ghost epoch tags to state the history-partition invariant.
+Raw operational calls have **no protocol premise**. The original soundness
+theorems prove protocol membership from the checker independently of runtime
+guards. The monitored semantics adds those guards and explicit error outcomes;
+its error-freedom and equivalence theorems follow from the raw results.
 Class correctness is preserved by the invariant. Uninitialized field loads
 have no transition, so the theorem concerns all executable prefixes and
 completed executions. It does not claim initialization progress. A separate

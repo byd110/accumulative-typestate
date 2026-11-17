@@ -1,5 +1,7 @@
-(* Operational semantics with a ghost epoch for each binding. Calls are
-   unguarded: protocol safety is a theorem, never an execution premise. *)
+(* Raw operational semantics with a ghost epoch for each binding. Raw calls
+   are unguarded: their protocol safety is proved independently of execution.
+   runtime_monitor.v layers explicit protocol checks and errors over these
+   unchanged steps and proves equivalence for statically accepted programs. *)
 From Coq Require Import List Arith Bool.
 From Accumulation Require Import syntax trace_languages.
 Import ListNotations.

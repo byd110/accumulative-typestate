@@ -10,10 +10,16 @@ in [README.md](README.md).
 certification and successful core client checking imply viability of every
 allocated object's history at every executable prefix and acceptance of each
 history at a completed execution. Optional history inheritance has the same
-conclusions under the stronger residual certificate. Neither result assumes
-protocol safety in the runtime call rule. For the fixed baseline core checker,
+conclusions under the stronger residual certificate. Neither raw result assumes
+protocol safety in the call rule. The monitored semantics adds explicit error
+outcomes, and its error freedom and equivalence follow from these raw results.
+For the fixed baseline core checker,
 the converse also holds: completion soundness for all accepted clients implies
-shuffle closure of every class protocol.
+shuffle closure of every class protocol. Here necessity and the iff result
+concern **raw completion soundness**, not completion of successful monitored
+runs, whose exit guard enforces acceptance by definition. The new monitor proves
+certification implies error freedom and execution equivalence; a converse for
+monitored error freedom is not asserted or mechanized here.
 
 Read the classifications as follows:
 
@@ -33,6 +39,27 @@ LaTeX labels identify paper results independently of their printed numbering.
 
 ## Claim extraction and traceability
 
+### Runtime-monitor extension
+
+These results formalize the runtime checks requested for Section 6, while
+preserving the original raw theorems. Guards inspect aggregate object histories;
+the static checker continues to track independent binding histories.
+
+| Claim | Evidence | Verdict and boundary |
+| --- | --- | --- |
+| Allocation checks empty-history viability; calls check the updated receiver history, with explicit failure outcomes. | `runtime_guard`, `monitored_step`, [`runtime_call_guard`](#declaration-runtime-call-guard); `empty_protocol_allocation_errors`, `invalid_call_monitor_errors` | PROVEN for the core. Failed guards produce `ProtocolError`; undefined ordinary accesses retain the raw semantics' lack of a step. |
+| Program exit checks completion for every allocated object, including unreachable objects. | [`runtime_exit_check_spec`](#declaration-runtime-exit-check-spec), `incomplete_retired_object_program_errors` | PROVEN. The final check occurs once at the selected path's end, not at each `Finish x`. |
+| Individual retirement preserves the aggregate completion predicate. | [`runtime_exit_check_retire`](#declaration-runtime-exit-check-retire), `individual_finish_allows_other_incomplete_object` | PROVEN. Checking the final predicate before or after retirements gives the same Boolean result. This does not formalize full surface instrumentation. |
+| Accepted baseline and inherited-history programs cannot signal protocol errors. | [`baseline_runtime_no_error`](#declaration-baseline-runtime-no-error), [`copying_runtime_no_error`](#declaration-copying-runtime-no-error) | PROVEN under ordinary shuffle certification or mode-aware certification respectively. Both rely on raw prefix/completion soundness rather than assuming the guards. |
+| Adding the monitor preserves exactly the successful complete executions of accepted programs. | [`baseline_runtime_equivalence`](#declaration-baseline-runtime-equivalence), [`copying_runtime_equivalence`](#declaration-copying-runtime-equivalence) | PROVEN in both directions with identical final core machines. Explicit accepted monitored runs establish nonvacuity. Initialization progress and general termination remain outside the result. |
+
+The paper's bulk `finish` and automatic insertion still require a separate
+source-to-core translation. The monitor closes the explicit runtime-error gap
+for the existing core; it does not claim to close the regex/environment-set or
+bulk-instrumentation correspondence gaps listed below.
+
+### Earlier language and checker results
+
 The first table paraphrases the formal claims from the current abstract,
 introduction, contribution list, and conclusion. Repeated claims remain visible
 so that an abstract-level statement can be checked without inferring its intended
@@ -44,12 +71,12 @@ line numbers. The first table's paraphrases are not verbatim quotations.
 | Claim and source | Current paper claim (paraphrased) | Evidence | Verdict | Exact scope or gap |
 | --- | --- | --- | --- | --- |
 | A1 [Abstract](../paper/abstract.tex) | Alias tracking can be omitted when operations through one reference preserve permissions established through other references to the same object. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound) | PROVEN, scoped | The formal result is for the specified independent-history checker and certified protocol family, not an arbitrary analysis satisfying an informal persistence description. |
-| A2 [Abstract](../paper/abstract.tex) | The paper formalizes a checker that tracks references independently and gives a necessary and sufficient protocol condition for that checking discipline. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the core | For this fixed baseline checker, all-object completion soundness holds exactly when every class protocol is shuffle closed. Paper-to-core surface correspondence remains separate. This does not characterize all analyses without aliases. |
+| A2 [Abstract](../paper/abstract.tex) | The paper formalizes a checker that tracks references independently and gives a necessary and sufficient protocol condition for that checking discipline. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the core | For this fixed baseline checker, raw all-object completion soundness holds exactly when every class protocol is shuffle closed. Paper-to-core surface correspondence remains separate. This does not characterize all analyses without aliases. |
 | A3 [Abstract](../paper/abstract.tex) | Calls through aliases interleave into one object history. Every interleaving of permitted complete histories must therefore remain permitted. | [`project_partition`](#declaration-project-partition), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed), [`invariant_object_language`](#declaration-invariant-object-language) | PROVEN | Fresh epoch histories partition actual calls. Inherited histories instead use completing continuations. They do not form this partition. |
 | A4 [Abstract](../paper/abstract.tex) | Regular expressions describe representative histories from which candidate protocols are constructed. A decision procedure certifies shuffle closedness or returns a counterexample. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`closure_regex_correct`](#declaration-closure-regex-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | Finite regular-expression input, finite inhabited alphabet for the pumping relation. Total Rocq definitions give termination. No practical runtime bound is claimed. |
 | A5 [Abstract](../paper/abstract.tex) | The paper connects its condition to accumulation analysis and gives a supported protocol whose safe histories violate the accumulation condition. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed), [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | PROVEN, scoped | The bridge extracts a first-error trace law and interprets non-error as extendibility to completion. It does not formalize the other analysis or compare accepted client programs. |
 | A6 [Abstract](../paper/abstract.tex) | For accepted programs, execution remains safe and every allocated object’s history is accepted at termination. | [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN, scoped | Accepted instrumented core programs. Completed execution is a premise. Explicit Finish x and the model boundaries below apply. Initialization progress and termination are not conclusions. |
-| A7 [Abstract](../paper/abstract.tex) | The Rocq development has approximately 5,300 lines of definitions and proofs and verifies the language constructions, certification procedures, and core checker soundness without additional axioms. | [audit.v](audit.v), `coqwc *.v`, [build instructions](README.md) | PROVEN for audited results / SOURCE/BUILD FACT for size | The line count is a reproducible size report, not a theorem. Principal theorem assumption reports establish the no-additional-axioms claim. Optional minimal-corpus results use classical logic. |
+| A7 [Abstract](../paper/abstract.tex) | The Rocq development has approximately 5,700 lines of definitions and proofs and verifies the language constructions, certification procedures, and core checker soundness without additional axioms. | [audit.v](audit.v), `coqwc *.v`, [build instructions](README.md) | PROVEN for audited results / SOURCE/BUILD FACT for size | The line count is a reproducible size report, not a theorem. Principal theorem assumption reports establish the no-additional-axioms claim. Optional minimal-corpus results use classical logic. |
 | I1 [Introduction, `sec:intro`](../paper/introduction.tex) | The sequential checker tracks each binding’s local history. Baseline assignment starts a fresh history, calls update only the receiver and require viability, and each binding must complete before it is discarded or the program exits. | [`check_step_sound`](#declaration-check-step-sound), [`check_step_complete`](#declaration-check-step-complete), [`check_trace_spec`](#declaration-check-trace-spec) | PROVEN | See the primitive-rule comparison below. Completion of a single alias does not discharge other bindings. |
 | I2 [Introduction, `sec:intro`](../paper/introduction.tex) | For any nonempty regular shuffle-closed protocol, accepted programs are safe at every execution prefix, and all allocated objects have complete histories at termination, including unreachable objects. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound) | PROVEN, scoped | The quantified locations satisfy l < next_loc m, with no reachability restriction. |
 | I3 [Introduction, `sec:intro`](../paper/introduction.tex) | Shuffle closedness is necessary for the stated discipline, which accepts every locally valid history. | [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified) | PROVEN, scoped | The converse constructs a baseline two-binding client for arbitrary complete histories and their chosen interleaving. It concerns this fixed checker, not every checker without alias information. |
@@ -61,7 +88,7 @@ line numbers. The first table's paraphrases are not verbatim quotations.
 | I9 [Introduction, contribution 3, `sec:intro`](../paper/introduction.tex) | The third contribution connects accumulation analysis to both checking modes through sufficient safety and completion conditions, and gives a certified protocol outside the accumulation condition. | [`kellogg_program_prefix_sound`](#declaration-kellogg-program-prefix-sound), [`kellogg_program_completion_sound`](#declaration-kellogg-program-completion-sound), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | PROVEN, scoped | The connection is semantic, under the extracted first-error interpretation and separate completion premise. |
 | I10 [Introduction, contribution 4, `sec:intro`](../paper/introduction.tex) | The fourth contribution mechanizes the language constructions, certificates, accumulation connection, and core checker soundness in Rocq. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`kellogg_regular_certificates`](#declaration-kellogg-regular-certificates), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound) | PROVEN | The cited Rocq modules implement this chain. |
 | I11 [Introduction, `sec:intro`](../paper/introduction.tex) | The principal Rocq theorems connect successful certification to prefix safety and completion in the core calculus without additional axioms. | [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN | See audit.v and the trust boundary below. Generalized protocol/certification hypotheses remain explicit inputs. |
-| I12 [Introduction, `sec:intro`](../paper/introduction.tex) | The Rocq development has approximately 5,300 project definition and proof lines, excluding bundled RegLang, and builds on Mathematical Components. | `coqwc *.v`, [build instructions](README.md) | SOURCE/BUILD FACT | The approximate count concerns project definitions and proofs, excluding bundled RegLang. It is not a mechanized mathematical claim. |
+| I12 [Introduction, `sec:intro`](../paper/introduction.tex) | The Rocq development has approximately 5,700 project definition and proof lines, excluding bundled RegLang, and builds on Mathematical Components. | `coqwc *.v`, [build instructions](README.md) | SOURCE/BUILD FACT | The approximate count concerns project definitions and proofs, excluding bundled RegLang. It is not a mechanized mathematical claim. |
 | C1 [Conclusion, `sec:conclusion`](../paper/body.tex) | Pumping closure constructs regular protocols from regular seed specifications. A finite seed criterion decides shuffle closedness of the result. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`certify_regex_spec`](#declaration-certify-regex-spec) | PROVEN | Same regular-language and alphabet scope as A4. |
 | C2 [Conclusion, `sec:conclusion`](../paper/body.tex) | Shuffle closedness characterizes sound composition for the baseline checker. Accepted programs preserve viable object histories at every prefix and complete every allocated object at termination. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the core | Checker environments store class/history pairs. The equivalence is specific to the baseline checker. Paper-to-core correspondence remains separate. |
 | C3 [Conclusion, `sec:conclusion`](../paper/body.tex) | An optional stronger certificate allows assignment to inherit source histories while completion checks remain independent. Every reachable derivative must be shuffle closed. | [`certify_residuals_spec`](#declaration-certify-residuals-spec), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | PROVEN | All prefixes induce reachable DFA states. The certificate includes the initial derivative. Empty derivatives satisfy closure vacuously. |
@@ -84,14 +111,26 @@ normalizing line breaks for the table.
 | [thm:seed-criterion](../paper/shuffle.tex)<br>For every seed language $S$,<br>\[<br>\text{$S$ satisfies the seed-shuffle condition}<br>\quad\Longleftrightarrow\quad<br>\text{$\pc{S}$ is shuffle closed}.<br>\] | [`seed_shuffle_coveredP`](#declaration-seed-shuffle-coveredP), [`base_shuffle_coveredP`](#declaration-base-shuffle-coveredP) | PROVEN, scoped | seed_shuffle_coveredP covers arbitrary Prop-valued seed languages via covered_by. base_shuffle_coveredP connects Boolean seed predicates to the inductive pumping closure. Both use the inhabited finite alphabet disclosed in the paper. The empty-alphabet case is paper-level. |
 | [thm:decision](../paper/shuffle.tex)<br>Applied to $F(r)$, Algorithm~\ref{alg:certify} terminates and accepts exactly when $\pc{\denote{r}}$ is shuffle closed.<br>On rejection, its result $(u,v,z)$ satisfies<br>\[<br>u,v\in\pc{\denote{r}},\qquad<br>\interleave{u}{v}{z},\qquad z\notin\pc{\denote{r}}.<br>\] | [`certify_seeds_spec`](#declaration-certify-seeds-spec), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | certify_regex is Boolean. Regex_counterexample is its separate total diagnostic function. regex_counterexample_none equates witness absence with success. Regex_counterexample_complete proves a witness exists on rejection. |
 | [lem:prefix-shuffle](../paper/typestate.tex)<br>If $K$ is shuffle closed, then $\pref{K}$ is shuffle closed. | [`prefix_shuffle_closed`](#declaration-prefix-shuffle-closed), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed) | PROVEN | Finite composition requires a nonempty set of component histories, so no premise K [] is needed. |
-| [lem:local](../paper/typestate.tex)<br>For every execution prefix of an ordinarily well-typed, initialized program $s$ satisfying $\vdash_{\mathrm{prog}}s$, one of its static environments corresponds to the execution and satisfies:<br>\begin{enumerate}<br>\item If $x$ is live in epoch $e$, $\rho(x)=\lambda(e)$ and $\Gamma(x)=(\kappa(\lambda(e)),R)$ with $\denote{R}=t_e^{-1}K_{\kappa(\lambda(e))}\neq\emptyset$.<br>\item Every retired epoch $e$ has $t_e\in K_{\kappa(\lambda(e))}$.<br>\end{enumerate} | [`preservation`](#declaration-preservation), [`trace_preservation`](#declaration-trace-preservation), [`residual_snoc`](#declaration-residual-snoc), [`residual_nullable`](#declaration-residual-nullable) | PROVEN for the core invariant | The core invariant stores class agreement, heap typing for defined fields, viable live histories, and completed retired histories. Initialization safety is a separate assumption. Matching the paper regex environments, environment sets, and bulk exit requires the unmechanized refinement below. |
-| [lem:object-shuffle](../paper/typestate.tex)<br>At every runtime prefix, for each allocated location $\ell$, its history $h(\ell)$ is an interleaving of the histories of all epochs $e$ such that $\lambda(e)=\ell$, including retired epochs. | [`project_partition`](#declaration-project-partition), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed), [`invariant_object_language`](#declaration-invariant-object-language) | PROVEN for fresh histories | object_history is the erasure of the relevant tagged events. Every allocated location has an epoch, including after bindings disappear. There is no separate n-ary shuffle relation. The projection theorem supplies the exact composition fact. |
-| [thm:typestate](../paper/typestate.tex)<br>Let every class protocol $K_C$ be regular and shuffle closed.<br>If an ordinarily well-typed, initialized, closed source program $s$ satisfies $\vdash_{\mathrm{prog}}s$, then:<br>\begin{enumerate}<br>\item No execution of the program encounters a protocol error.<br>At every execution prefix and allocated location $\ell$, $h(\ell)\in\pref{K_{\kappa(\ell)}}$.<br>\item On termination, every allocated object has a complete history: $h(\ell)\in K_{\kappa(\ell)}$, including objects no longer reachable from variables or fields.<br>\end{enumerate}<br>Executions include the automatically inserted exit operation.<br>The static checker maintains no alias relation. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound) | WEAKER as a source-language theorem | The complete conclusion is proven for the semantic core under certified P and acceptance by the core checker. Nonemptiness is checked when a binding starts, rather than assumed for every class. Bulk finish, automatic exit insertion, and correspondence with regex-valued environment sets remain unmechanized. The core theorems do not establish initialization safety. |
-| [prop:necessary](../paper/typestate.tex)<br>If arbitrary pairs of complete local histories from $K$ must combine into a complete object history under every interleaving, then $K$ must be shuffle closed. | [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the baseline core | The formal converse turns completion soundness for every accepted baseline core program and execution into certified P. Its proof builds the two-binding client for arbitrary complete histories and a chosen interleaving. No converse for other analyses or the optional copying mode is asserted. |
+| [lem:local](../paper/typestate.tex)<br>Let $s$ be an ordinarily well-typed, initialized program satisfying $\vdash_{\mathrm{prog}}s$.<br>At each execution prefix of $s$ with the protocol checks erased, one of its static environments corresponds to the execution and satisfies:<br>\begin{enumerate}<br>\item If $x$ is live in epoch $e$, $\rho(x)=\lambda(e)$ and $\Gamma(x)=(\kappa(\lambda(e)),R)$ with $\denote{R}=t_e^{-1}K_{\kappa(\lambda(e))}\neq\emptyset$.<br>\item Every retired epoch $e$ has $t_e\in K_{\kappa(\lambda(e))}$.<br>\end{enumerate} | [`preservation`](#declaration-preservation), [`trace_preservation`](#declaration-trace-preservation), [`residual_snoc`](#declaration-residual-snoc), [`residual_nullable`](#declaration-residual-nullable) | PROVEN for the core invariant | The core invariant stores class agreement, heap typing for defined fields, viable live histories, and completed retired histories. Initialization safety is a separate assumption. Matching the paper regex environments, environment sets, and bulk exit requires the unmechanized refinement below. |
+| [lem:object-shuffle](../paper/typestate.tex)<br>With the protocol checks erased, at every runtime prefix and allocated location $\ell$, its history $h(\ell)$ is an interleaving of the histories of all epochs $e$ such that $\lambda(e)=\ell$, including retired epochs. | [`project_partition`](#declaration-project-partition), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed), [`invariant_object_language`](#declaration-invariant-object-language) | PROVEN for fresh histories | object_history is the erasure of the relevant tagged events. Every allocated location has an epoch, including after bindings disappear. There is no separate n-ary shuffle relation. The projection theorem supplies the exact composition fact. |
+| [thm:typestate](../paper/typestate.tex)<br>Let every class protocol $K_C$ be regular and shuffle closed.<br>If an ordinarily well-typed, initialized, closed source program $s$ satisfies $\vdash_{\mathrm{prog}}s$, then, with the runtime protocol checks erased:<br>\begin{enumerate}<br>\item At every execution prefix and allocated location $\ell$, $h(\ell)\in\pref{K_{\kappa(\ell)}}$.<br>\item On normal termination, every allocated object has a complete history: $h(\ell)\in K_{\kappa(\ell)}$, including objects no longer reachable from variables or fields.<br>\end{enumerate}<br>Restoring the checks preserves exactly the completed executions, and no monitored execution reaches $\mathsf{error}$.<br>Executions include the automatically inserted exit operation.<br>The static checker maintains no alias relation. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`baseline_runtime_no_error`](#declaration-baseline-runtime-no-error), [`baseline_runtime_equivalence`](#declaration-baseline-runtime-equivalence) | WEAKER as a source-language theorem | The complete conclusion is proven for the semantic core under certified P and acceptance by the core checker. Nonemptiness is checked when a binding starts, rather than assumed for every class. Bulk finish, automatic exit insertion, and correspondence with regex-valued environment sets remain unmechanized. The core theorems do not establish initialization safety. |
+| [prop:necessary](../paper/typestate.tex)<br>If arbitrary pairs of complete local histories from $K$ must combine into a complete object history under every interleaving, then $K$ must be shuffle closed. | [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the baseline core | The formal converse turns raw completion soundness for every accepted baseline core program and execution into certified P. Its proof builds the two-binding client for arbitrary complete histories and a chosen interleaving. No converse for other analyses or the optional copying mode is asserted. |
 | [cor:certified-typestate](../paper/typestate.tex)<br>If Algorithms~\ref{alg:construct} and~\ref{alg:certify} construct and certify every class protocol, an ordinarily well-typed, initialized, closed source program accepted by Algorithm~\ref{alg:client} has the guarantees of Theorem~\ref{thm:typestate}. | [`regular_family_certified`](#declaration-regular-family-certified), [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound) | WEAKER as a source-language corollary | The compiled regular-seed family is certified and composed with the core checker in regular_soundness.v over a finite inhabited alphabet. Certification supplies shuffle closedness, not nonemptiness, which remains a binding check. The paper-level Algorithm 3 and its automatic bulk finish have no mechanized implementation correspondence. |
-| [thm:copying-soundness](../paper/typestate.tex)<br>Assume every class protocol is regular and shuffle closed, and every opted-in class satisfies Equation~\eqref{eq:residual-shuffle}.<br>An ordinarily well-typed, initialized, closed source program satisfying the program judgment with the optional assignment rule has the prefix-safety and all-object completion guarantees of Theorem~\ref{thm:typestate}. | [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | WEAKER as a source-language theorem | The core result is complete under copying_certified, including nested and mixed copying. Classes using fresh histories require semantic shuffle closedness, while opted-in classes additionally require residual shuffle closedness. It inherits the same paper-to-core correspondence and initialization boundary as thm:typestate. |
+| [thm:copying-soundness](../paper/typestate.tex)<br>Assume every class protocol is regular and shuffle closed, and every opted-in class satisfies Equation~\eqref{eq:residual-shuffle}.<br>An ordinarily well-typed, initialized, closed source program satisfying the program judgment with the optional assignment rule has all guarantees of Theorem~\ref{thm:typestate}, including safety with protocol checks erased and absence of runtime protocol errors. | [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound), [`copying_runtime_no_error`](#declaration-copying-runtime-no-error), [`copying_runtime_equivalence`](#declaration-copying-runtime-equivalence) | WEAKER as a source-language theorem | The core result is complete under copying_certified, including nested and mixed copying. Classes using fresh histories require semantic shuffle closedness, while opted-in classes additionally require residual shuffle closedness. It inherits the same paper-to-core correspondence and initialization boundary as thm:typestate. |
 | [thm:accumulation-prefix](../paper/typestate.tex)<br>Suppose $P=\pref{K}$ is decidable.<br>Equation~\eqref{eq:accumulation-error} holds if and only if every derivative $p^{-1}P$ is shuffle closed. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed) | PROVEN | K is arbitrary Prop-valued language over any Type. Decidability of prefix_language K is an explicit hypothesis. No classical axiom supplies it. |
 | [thm:accumulation-bridge](../paper/typestate.tex)<br>If $K$ is an accumulation contract, every derivative $p^{-1}K$ is shuffle closed.<br>In particular, $K$ is shuffle closed. | [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`accumulation_contract_shuffle_closed`](#declaration-accumulation-contract-shuffle-closed) | PROVEN | The positive safe-extension law and completion stability form accumulation_contract. No regularity, finite alphabet, or decidability premise is needed for this implication. |
+
+The monitored conclusions also compose with the compiled and accumulation
+entry points. Unfolding `check_regular_program` supplies core acceptance and,
+through `compiled_family_certified`, the certificate required by
+`baseline_runtime_no_error` and `baseline_runtime_equivalence`. Unfolding
+`check_regular_program_with_copy` supplies copying-checker acceptance and,
+through `copying_table_sound`, the certificate required by
+`copying_runtime_no_error` and `copying_runtime_equivalence`.
+`kellogg_protocol_copying_certified` supplies the same certificate under the
+accumulation premises. The `cor:certified-typestate` and copying/Kellogg rows
+use these compositions for their monitored conclusions; no additional
+specialized monitor theorem is claimed.
 
 ## Interfaces and supporting results from the artifact guide
 
@@ -131,7 +170,7 @@ result to the paper's surface algorithm.
 | Pumping `w = pq`, `w′ = paq`, with `a` occurring in `p` | `pumping`, `pump_at`, `pumping_decompose`, `pumping_insert_char_after_prefix` in [pumping.v](pumping.v) | Indexed bounds ensure the copied event precedes the insertion. The default event is never read out of bounds by a successful step. The two decomposition/insertion lemmas connect the presentations. |
 | Pumping closure and originating seeds | `pumping_closure`, `seed_covers`, `covered_by`, `pumping_closure_seed_corpus` | Closure is an inductive proposition, separate from the generated regex. Factorization does not assume the desired language equality. |
 | Residual `u⁻¹K`, viability, nullability | `residual`, `prefix_language`, `qualifier_language`, `protocol_family.viable_spec` | A qualifier stores a class/history pair denoting an exact residual. Boolean acceptance is the definition of `protocol`. Viability is required to have a proof of its extension contract. |
-| Dynamic New | `run_new`, `allocate`, `install` in [semantics.v](semantics.v) | Fresh locations and epochs are successive naturals. The paper permits any fresh location. A renaming/ghost-erasure correspondence is not a separate theorem. Neither semantics tests protocol membership. |
+| Dynamic New | `run_new`, `allocate`, `install` in [semantics.v](semantics.v); `runtime_guard`, `monitored_step` | The raw step is unguarded; its monitored version checks empty-history viability and signals `ProtocolError` on failure. Fresh locations and epochs are successive naturals. The paper permits any fresh location; a renaming/ghost-erasure correspondence is not a separate theorem. |
 | Static New | `type_new`, `check_bind` in [typestate.v](typestate.v) | Outgoing target is retirable. The new class's empty history is viable. The new history is empty. |
 | Dynamic Assign | `run_copy`, `bind` | Source is looked up in the pre-state. A new epoch refers to the same location, including self-assignment. No event is appended. |
 | Static Assign | `type_copy`, `check_step (Copy x y)` | Source lookup, target retirement, and initial viability match the fresh-history premises. Source and target can be equal. The old target must still be complete. |
@@ -140,9 +179,9 @@ result to the paper's surface algorithm.
 | Static Load | `type_load`, `check_bind` | The target retires, the source binding exists, and the field class's initial history is viable. Fields always start fresh, even in copying mode. `field_type` is total. Field declaration validity belongs to the paper's ordinary typing layer. |
 | Dynamic Store | `run_store`, `store` | Both bindings must exist. The location-field entry changes. Epoch owners and histories do not. |
 | Static Store | `type_store` | `field_type` equals the source class, and the qualifier environment is unchanged. Heap/class agreement is preserved in the invariant. |
-| Dynamic Call | `run_call`, `emit` | Source lookup is the only premise. An arbitrary event can be emitted even when it violates a protocol. Safety must follow from checking. |
+| Dynamic Call | `run_call`, `emit`, `runtime_guard`, `monitored_step`, `runtime_call_guard` | The raw rule requires only source lookup and can emit an invalid event. The monitored rule additionally checks viability of the updated aggregate receiver history and signals `ProtocolError` on failure. Error freedom for accepted programs follows from independent raw soundness. |
 | Static Call | `type_call`, `check_step (Call x a)` | Only the receiver history is extended. The extended history must be viable. The artifact uses a common event type `A`, with no separate `a ∈ Σ_C` judgment. Per-class event admissibility can be represented by protocol membership. Ordinary method typing is outside the formalization. |
-| Dynamic/static Finish | `run_finish`, `type_finish`, `check_step (Finish x)` | Rocq retires one existing binding and checks that binding's acceptance. It preserves objects, fields, and event histories. Paper bulk `finish` retires all bindings at once. That implementation correspondence is unmechanized. |
+| Dynamic/static Finish | `run_finish`, `type_finish`, `check_step (Finish x)`, `runtime_exit_check` | Raw and monitored core `Finish x` retire one existing binding without a dynamic protocol guard; the static checker checks that binding's acceptance. The monitored program boundary separately checks all allocated object histories. Retirement preserves that check. Paper bulk `finish` retires all bindings at once; the complete source-to-core implementation correspondence is unmechanized. |
 | Skip | `Skip`, `paths Skip = [[]]` | The empty trace leaves the environment and machine unchanged. |
 | Seq | `paths`, `path_seq`, `typed_trace`, `execution` | Sequential paths are concatenated. Checking and execution compose along them. This represents finite branching syntax. |
 | If | `Branch`, `path_left`, `path_right`, `paths_spec`, `forallb` in `check_program` | Both branch paths are checked universally. Boolean conditions are abstracted as nondeterministic choices. No feasible-path precision claim is made. The paper instead propagates sets of residual environments. |
@@ -1426,4 +1465,115 @@ Lemma separating_residual_not_closed : ~ residual_shuffle_closed (protocol separ
 
 ```coq
 Lemma separating_acb_not_viable : viable separating_family 0 [:: a; c; b] = false.
+```
+
+## Runtime-monitor declaration index
+
+All declarations below generalize the section parameters `A : Type` and
+`P : protocol_family A`. Protocol families carry verified Boolean membership
+and viability queries; no new global assumptions are introduced.
+
+<a id="declaration-runtime-call-guard"></a>
+
+### `runtime_call_guard`
+
+[runtime_monitor.v:35](runtime_monitor.v#L35)
+
+```coq
+Lemma runtime_call_guard x a m m' l :
+  raw_step (Call x a) m m' -> reference m x = Some l ->
+  runtime_guard (Call x a) m m' =
+    viable P (classes m l) (object_history m l ++ [a]).
+```
+
+<a id="declaration-runtime-exit-check-spec"></a>
+
+### `runtime_exit_check_spec`
+
+[runtime_monitor.v:55](runtime_monitor.v#L55)
+
+```coq
+Lemma runtime_exit_check_spec m : runtime_exit_check m = true <->
+  forall l, l < next_loc m -> protocol P (classes m l) (object_history m l).
+```
+
+<a id="declaration-runtime-exit-check-retire"></a>
+
+### `runtime_exit_check_retire`
+
+[runtime_monitor.v:52](runtime_monitor.v#L52)
+
+```coq
+Lemma runtime_exit_check_retire m x : runtime_exit_check (retire m x) = runtime_exit_check m.
+```
+
+<a id="declaration-raw-contract-monitor-no-error"></a>
+
+### `raw_contract_monitor_no_error`
+
+[runtime_monitor.v:169](runtime_monitor.v#L169)
+
+```coq
+Theorem raw_contract_monitor_no_error s : raw_protocol_contract s ->
+  ~ monitored_program s initial_machine ProtocolError.
+```
+
+<a id="declaration-raw-contract-monitor-equivalence"></a>
+
+### `raw_contract_monitor_equivalence`
+
+[runtime_monitor.v:185](runtime_monitor.v#L185)
+
+```coq
+Theorem raw_contract_monitor_equivalence s : raw_protocol_contract s -> forall m,
+  monitored_program s initial_machine (RuntimeState m) <->
+  program_execution s initial_machine m.
+```
+
+<a id="declaration-baseline-runtime-no-error"></a>
+
+### `baseline_runtime_no_error`
+
+[runtime_monitor.v:205](runtime_monitor.v#L205)
+
+```coq
+Theorem baseline_runtime_no_error FT s : certified P ->
+  check_program P FT s = true -> ~ monitored_program s initial_machine ProtocolError.
+```
+
+<a id="declaration-baseline-runtime-equivalence"></a>
+
+### `baseline_runtime_equivalence`
+
+[runtime_monitor.v:209](runtime_monitor.v#L209)
+
+```coq
+Theorem baseline_runtime_equivalence FT s : certified P -> check_program P FT s = true ->
+  forall m, monitored_program s initial_machine (RuntimeState m) <->
+    program_execution s initial_machine m.
+```
+
+<a id="declaration-copying-runtime-no-error"></a>
+
+### `copying_runtime_no_error`
+
+[runtime_monitor.v:222](runtime_monitor.v#L222)
+
+```coq
+Theorem copying_runtime_no_error FT mode s : copying_certified P mode ->
+  check_program_with_copy P FT mode s = true ->
+  ~ monitored_program s initial_machine ProtocolError.
+```
+
+<a id="declaration-copying-runtime-equivalence"></a>
+
+### `copying_runtime_equivalence`
+
+[runtime_monitor.v:227](runtime_monitor.v#L227)
+
+```coq
+Theorem copying_runtime_equivalence FT mode s : copying_certified P mode ->
+  check_program_with_copy P FT mode s = true -> forall m,
+  monitored_program s initial_machine (RuntimeState m) <->
+    program_execution s initial_machine m.
 ```

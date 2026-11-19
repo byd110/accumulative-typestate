@@ -50,4 +50,15 @@ residual_certification_examples.v
 accumulation_examples.v
 kellogg_separation.v
 runtime_monitor_examples.v
+monotone_protocols.v
+monotone_pumping.v
+monotone_regular.v
+pattern_seed_automata.v
+prerequisite_patterns.v
+prerequisite_examples.v
+threshold_patterns.v
+threshold_examples.v
+capacity_patterns.v
+capacity_seed_table.v
+capacity_seed_patterns.v
 audit.v

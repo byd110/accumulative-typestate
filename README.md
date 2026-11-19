@@ -8,6 +8,9 @@ per-class mode copies assignment histories when every reachable residual is
 also shuffle closed, with a separate verified certificate and soundness proof.
 An explicit semantic bridge relates these closure conditions to the
 first-error subsequence property of Kellogg et al.'s *Accumulation Analysis*.
+Parameterized protocol families cover persistent prerequisites, count
+thresholds, and reusable capacity. Their executable queries, certificates,
+concrete seed languages, and aliasing clients are verified in the same core.
 
 Start with the [claim-to-theorem map](CLAIM_THEOREM_MAP.md) for current paper
 claims, exact theorem signatures, hypotheses, and remaining gaps. The
@@ -53,13 +56,13 @@ make clean       # remove generated proof artifacts
 ```
 
 For a clean verification, run `make clean` first, then the three build/check
-commands. Each must exit with status zero. `make check` scans all 49 sources
-listed in `_CoqProject` and kernel-checks the audit/example dependency closure.
-`make assumptions` prints 185 reports, each expected to say
-`Closed under the global context`. The 37 project sources contain 3,640
-specification lines and 4,393 proof lines (8,033 total by `coqwc *.v`),
-excluding the 12 bundled RegLang sources and comments. `_CoqProject` and
-`audit.v` are the authoritative source and audit inventories.
+commands. Each must exit with status zero. `make check` scans the sources
+listed in [_CoqProject](_CoqProject) and kernel-checks the audit/example
+dependency closure. `make assumptions` prints the reports listed in
+[audit.v](audit.v), each expected to say `Closed under the global context`.
+These files are the authoritative source and audit inventories. To measure the
+current project definitions and proofs, run `coqwc *.v`; this excludes comments
+and the bundled RegLang sources, and includes examples and audit queries.
 
 `_CoqProject` maps project modules to `Accumulation` and the bundled library to
 `RegLang`. Coq reports an overlapping-loadpath warning because the latter is a
@@ -89,6 +92,9 @@ certification and typestate results do not depend on that argument.
 | Metatheory | `invariants.v`: binding epochs, heap/class agreement, retired obligations, and preservation. `soundness.v`: prefix safety and all-object completion. `necessity.v`: completion soundness of the baseline core checker iff every class protocol is shuffle closed. `regular_soundness.v`: finite class-table certification composed with the client checker. |
 | Optional history copying | `copying_typestate.v`: per-class mode and exact recovery of the original checker. `copying_languages.v`, `copying_soundness.v`: completion-continuation invariant, bulk-clear and configuration preservation, and source-program safety. `residual_certification.v`: exact finite DFA certificate. `copying_regular_soundness.v`: certified regular-seed integration. |
 | Accumulation relationship | `accumulation_bridge.v`: first-error subsequence law, exact safety/residual-shuffle correspondence, and sufficient completion contract. `accumulation_integration.v`: observation interpretation, existing finite certificates, and client-soundness consequences. `accumulation_examples.v`: an inhabited contract and separating examples. `kellogg_separation.v`: the first-error separation and a concrete unsafe client when copying lacks its certificate. |
+| Persistent machines | `monotone_protocols.v`: guarded runs, shuffle-closed derivatives, and safe repeat insertion. `monotone_pumping.v`: pumping closure. `monotone_regular.v`: finite DFA/regex representation and both certificates. |
+| Prerequisite and threshold families | `prerequisite_patterns.v` and `prerequisite_examples.v`: monotone prerequisite predicates, all-of/any-of instances, exact displayed seed languages, and checked inherited aliases. `threshold_patterns.v` and `threshold_examples.v`: arbitrary thresholds, exact queries, saturated finite states, exact seeds including threshold zero, and checked aliases in both modes. |
+| Reusable capacity | `capacity_patterns.v`: the prefix budget invariant over finite resource identities, basic certification, regularity, separation from residual closure and accumulation, and checked clients. `capacity_seed_table.v` and `capacity_seed_patterns.v`: checked exact correspondence with the displayed two-name six-seed language. `pattern_seed_automata.v`: generic frontier and DFA simulation lemmas. |
 | Verification | `examples.v`, `certification_examples.v`, `copying_examples.v`, `residual_certification_examples.v`, `accumulation_examples.v`, `runtime_monitor_examples.v`, `audit.v`, and `check_sources.py`. |
 
 The [bundled-library notice](RegLang/README.md) records RegLang's provenance,
@@ -251,6 +257,74 @@ positive law. `protocol_family` supplies it via its verified viability query.
 The regular-seed integration retains the existing finite-alphabet and
 default-symbol parameters. All new theorem audits are closed under the
 global context.
+
+## Verified protocol patterns
+
+The families in the paper's [protocol-pattern section](../paper/protocol-patterns.tex)
+instantiate the existing `protocol_family` interface. Their Boolean viability
+queries mean exactly that some completing suffix exists. Completion requires
+at least one designated use, which is an obligation of the modeled client.
+
+The `monotone_machine` interface in [monotone_protocols.v](monotone_protocols.v)
+requires upward-closed guards and acceptance, monotone enabled transitions,
+and inflationary transitions. `machine_language_residual_shuffle_closed` and
+`machine_language_repeat` prove continuation composition and repeat insertion.
+[monotone_pumping.v](monotone_pumping.v) connects repetition to pumping closure.
+For finite alphabets and states with Boolean guard and acceptance queries,
+[monotone_regular.v](monotone_regular.v) constructs a DFA and a regular seed
+expression: `finite_machine_regular_family_language` proves exact language
+equality, and `finite_machine_seed_certificate` and
+`finite_machine_copying_certificate` establish both certificates.
+
+| Family | Definitions and main guarantees |
+| --- | --- |
+| Persistent prerequisites | [prerequisite_patterns.v](prerequisite_patterns.v): `prerequisite_spec` packages a satisfiable monotone Boolean predicate on a finite feature set. `all_prerequisites` and `any_prerequisites` instantiate it. `prerequisite_viable_spec`, `prerequisite_protocol_copying_certified`, `prerequisite_language_regular`, and `prerequisite_regular_family_exact` connect queries, both modes, and regular seeds. |
+| Count thresholds | [threshold_patterns.v](threshold_patterns.v): `threshold_family N` permits `Use` only after at least `N` increments and permits subsequent increments and uses. `threshold_queries`, `threshold_language_shape`, and `threshold_copying_certified` characterize queries and both modes for every natural `N`. [threshold_examples.v](threshold_examples.v): `threshold_finite_language`, `threshold_regular`, and `threshold_regular_family_exact` justify the saturated finite-state representation. |
+| Reusable capacity | [capacity_patterns.v](capacity_patterns.v): `capacity_safeP` equates the executable check with the requirement that every prefix uses at most as many distinct identities as it has capacity additions. `capacity_viable_spec`, `capacity_certified`, and `capacity_regular` give exact viability, basic certification, and regularity. With two distinct identities, `capacity_not_residual` and `capacity_certified_not_kellogg` prove the stronger conditions fail. |
+
+The pumping closures of the concrete seeds equal the **whole** modeled
+languages. In [prerequisite_examples.v](prerequisite_examples.v),
+`builder_displayed_seeds_exact` covers `{abu,bau}` and
+`alternative_displayed_seeds_exact` covers `{au,bu,abu,aub,bau,bua}`.
+These Boolean equalities connect to pumping closure through `coveredb_spec`.
+In [threshold_examples.v](threshold_examples.v),
+`threshold_singleton_seed_exact` covers `{a^N u}` when `N > 0`, and
+`threshold_zero_seeds_exact` covers `{u,au,ua}` when `N = 0`.
+In [capacity_seed_patterns.v](capacity_seed_patterns.v),
+`capacity_six_seeds_exact` covers `{ab,ac,aabc,abac,aacb,acab}` for two identities.
+The letters in these displays follow the paper; the modules use their stated
+Boolean or option encodings.
+
+The family modules also check clients and failures. The builder and threshold
+examples accept inherited aliases, reject the corresponding client without
+inheritance, and exhibit terminating runs and exact object histories.
+`threshold_counts_not_sets` shows that one and two increments have different
+permissions despite containing the same event set. Capacity examples accept
+fresh-history aliases and repeated use of one identity; they reject overdraw,
+late capacity additions, and an incomplete alias. The `prerequisite_checked_*`,
+`threshold_*_sound`, and `capacity_program_*_sound` results connect these families
+to the existing prefix/completion guarantees.
+
+For direct evaluation, `capacity_executable_family` uses a duplicate-free list
+of occupied identities. `capacity_safe_query_correct` and
+`capacity_complete_query_correct` prove equality with the finite-set model;
+`capacity_executable_certified` supplies the generic checker premise. The
+capacity clients evaluate this implementation, and their completion example
+transfers the resulting guarantee back to the semantic language.
+
+The capacity frontier table can be reproduced without overwriting the source:
+
+```sh
+python3 generate_capacity_frontier.py > /tmp/capacity_seed_table.v
+diff -u capacity_seed_table.v /tmp/capacity_seed_table.v
+```
+
+The Python generator is untrusted. Rocq checks the table's initial frontier,
+every transition, acceptance, and simulation into the semantic capacity DFA.
+The exact-language proof therefore covers arbitrary words. The paper's
+AutoValue, Commons CLI, and append-only `ArrayList` fragments motivate event
+interpretations; the artifact does not verify those Java implementations or a
+translation from Java into the core calculus.
 
 ## Semantic choices and scope
 

@@ -101,21 +101,11 @@ Qed.
    without its required residual certificate.  The residual certificate used
    by check_regular_program_with_copy rejects this protocol, as witnessed by
    separating_copy_certificate_rejected in residual_certification_examples. *)
-Local Fixpoint separating_block (instrs : list (instruction B)) : statement B :=
-  match instrs with
-  | nil => Skip
-  | i :: rest => Seq (Do i) (separating_block rest)
-  end.
-Local Lemma separating_block_path instrs : path (separating_block instrs) instrs.
-Proof.
-  induction instrs as [|i instrs IH]; simpl; [constructor|].
-  change (path (Seq (Do i) (separating_block instrs)) ([::i] ++ instrs)).
-  constructor; [constructor|exact IH].
-Qed.
+Local Definition separating_block (stmts : list (statement B)) : statement B := sequence stmts.
 Local Definition separating_fields (cl : class) (_ : field) := cl.
 
 Definition separating_copy_program := separating_block
-  [:: New 0 0; Call 0 a; Copy 1 0; Call 0 c; Call 1 b; Finish 0; Finish 1].
+  [:: New 0 0; Call 0 a; Copy 1 0; Call 0 c; Call 1 b].
 
 Local Lemma separating_initial_viable : viable separating_family 0 [::] = true.
 Proof. apply viable_spec; exists [::a;b]; exact separating_ab_complete. Qed.
@@ -130,27 +120,23 @@ Example separating_copy_accepted_without_certificate :
   check_program_with_copy separating_family separating_fields (fun _ => true)
     separating_copy_program = true.
 Proof.
-  unfold check_program_with_copy, separating_copy_program.
-  cbn [paths separating_block List.flat_map List.map List.app List.forallb
-    check_trace_with_copy check_step_with_copy check_step check_bind retirable
-    get put andb Nat.eqb].
+  unfold check_program_with_copy, separating_copy_program, separating_block, instrument.
+  cbn [sequence finish_freeb check_stmt_with_copy check_step_with_copy check_step
+    check_bind retirable get put andb Nat.eqb].
   unfold check_bind, retirable; cbn [get andb Nat.eqb].
   rewrite separating_initial_viable.
-  cbn [check_trace_with_copy check_step_with_copy check_step check_bind retirable
+  cbn [check_stmt_with_copy check_step_with_copy check_step check_bind retirable
     get put andb Nat.eqb List.app].
   rewrite separating_a_viable.
-  cbn [check_trace_with_copy check_step_with_copy check_step check_bind retirable
+  cbn [check_stmt_with_copy check_step_with_copy check_step check_bind retirable
     get put andb Nat.eqb List.app].
   rewrite separating_ac_viable.
-  cbn [check_trace_with_copy check_step_with_copy check_step check_bind retirable
+  cbn [check_stmt_with_copy check_step_with_copy check_step check_bind retirable
     get put andb Nat.eqb List.app].
   rewrite separating_ab_viable.
-  cbn [check_trace_with_copy check_step_with_copy check_step check_bind retirable
-    get put andb Nat.eqb List.app].
-  rewrite separating_ac_complete.
-  cbn [check_trace_with_copy check_step_with_copy check_step check_bind retirable
-    get put andb Nat.eqb List.app].
-  rewrite separating_ab_complete.
+  cbn [check_stmt_with_copy check_step_with_copy check_step all_complete retirable
+    get put andb Nat.eqb List.app List.forallb fst].
+  rewrite separating_ac_complete separating_ab_complete.
   reflexivity.
 Qed.
 
@@ -160,16 +146,15 @@ Definition separating_copy_final : machine B :=
   let m := bind m 1 0 in
   let m := emit m 0 c in
   let m := emit m 1 b in
-  let m := retire m 0 in
-  retire m 1.
+  clear_refs m.
 
 Example separating_copy_terminates :
   program_execution separating_copy_program initial_machine separating_copy_final.
 Proof.
-  exists [:: New 0 0; Call 0 a; Copy 1 0; Call 0 c; Call 1 b; Finish 0; Finish 1].
-  split; first exact: separating_block_path.
-  unfold separating_copy_final.
-  repeat (eapply execution_cons; [econstructor; reflexivity|]); constructor.
+  unfold separating_copy_final. apply source_execution_instrument.
+  - reflexivity.
+  - unfold separating_copy_program, separating_block. simpl.
+    repeat (eapply execution_seq; [apply execution_primitive; econstructor; reflexivity|]); constructor.
 Qed.
 
 Example separating_copy_actual_history :

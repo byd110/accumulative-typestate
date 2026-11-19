@@ -48,57 +48,59 @@ Proof.
   - intros H [x ov] Hin; simpl; now rewrite H.
 Qed.
 
-Inductive instruction (A : Type) :=
+(* Public statements: source syntax is the finish-free fragment. *)
+Inductive statement (A : Type) :=
+| Skip
 | New (x : var) (c : class)
 | Copy (x y : var)
 | Load (x y : var) (f : field)
 | Store (x : var) (f : field) (y : var)
 | Call (x : var) (a : A)
-| Finish (x : var).
+| Finish
+| Seq (s t : statement A).
+Arguments Skip {A}.
 Arguments New {A} _ _.
 Arguments Copy {A} _ _.
 Arguments Load {A} _ _ _.
 Arguments Store {A} _ _ _.
 Arguments Call {A} _ _.
-Arguments Finish {A} _.
-Inductive statement (A : Type) :=
-| Skip
-| Do (i : instruction A)
-| Seq (s t : statement A)
-| Branch (s t : statement A).
-Arguments Skip {A}.
-Arguments Do {A} _.
+Arguments Finish {A}.
 Arguments Seq {A} _ _.
-Arguments Branch {A} _ _.
 
-(* Both outcomes of a protocol-pure condition are checked. *)
-Fixpoint paths {A} (s : statement A) : list (list (instruction A)) :=
-  match s with
-  | Skip => [[]]
-  | Do i => [[i]]
-  | Seq s t => flat_map (fun p => map (fun q => p ++ q) (paths t)) (paths s)
-  | Branch s t => paths s ++ paths t
-  end.
-Inductive path {A} : statement A -> list (instruction A) -> Prop :=
-| path_skip : path Skip []
-| path_do i : path (Do i) [i]
-| path_seq s t p q : path s p -> path t q -> path (Seq s t) (p ++ q)
-| path_left s t p : path s p -> path (Branch s t) p
-| path_right s t q : path t q -> path (Branch s t) q.
-Lemma paths_spec {A} (s : statement A) p : In p (paths s) <-> path s p.
+Inductive context (A : Type) :=
+| Hole
+| SeqLeft (E : context A) (t : statement A).
+Arguments Hole {A}.
+Arguments SeqLeft {A} _ _.
+Fixpoint plug {A} (E : context A) (s : statement A) :=
+  match E with Hole => s | SeqLeft F t => Seq (plug F s) t end.
+Fixpoint compose {A} (E F : context A) :=
+  match E with Hole => F | SeqLeft E t => SeqLeft (compose E F) t end.
+Lemma plug_compose {A} (E F : context A) s :
+  plug (compose E F) s = plug E (plug F s).
+Proof. induction E; simpl; congruence. Qed.
+
+Fixpoint finish_freeb {A} (s : statement A) : bool :=
+  match s with Finish => false | Seq s t => finish_freeb s && finish_freeb t | _ => true end.
+Definition finish_free {A} (s : statement A) := finish_freeb s = true.
+Definition instrument {A} (s : statement A) := Seq s Finish.
+Fixpoint finish_count {A} (s : statement A) : nat :=
+  match s with Finish => 1 | Seq s t => finish_count s + finish_count t | _ => 0 end.
+Lemma finish_free_count {A} (s : statement A) :
+  finish_free s <-> finish_count s = 0.
 Proof.
-  split.
-  - revert p; induction s; simpl; intros p H.
-    + destruct H as [<-|H]; [constructor|contradiction].
-    + destruct H as [<-|H]; [constructor|contradiction].
-    + apply in_flat_map in H; destruct H as [q [Hq H]].
-      apply in_map_iff in H; destruct H as [r [<- Hr]]. constructor; auto.
-    + apply in_app_or in H; destruct H; [apply path_left|apply path_right]; auto.
-  - intros H; induction H; simpl; auto.
-    + apply in_flat_map; exists p; split; auto. apply in_map; assumption.
-    + apply in_or_app; auto.
-    + apply in_or_app; auto.
+  unfold finish_free; induction s; simpl; try tauto; try (split; discriminate).
+  rewrite andb_true_iff, IHs1, IHs2. lia.
 Qed.
+Theorem instrument_single_exit {A} (s : statement A) :
+  finish_free s -> finish_count (instrument s) = 1.
+Proof. intros H; apply finish_free_count in H. simpl. lia. Qed.
+Theorem instrument_not_source {A} (s : statement A) : ~ finish_free (instrument s).
+Proof. unfold finish_free, instrument; simpl. rewrite andb_false_r. discriminate. Qed.
+
+(* A notation-building helper, not an execution semantics. *)
+Fixpoint sequence {A} (ss : list (statement A)) : statement A :=
+  match ss with [] => Skip | s :: ss => Seq s (sequence ss) end.
 
 (* Lookup current bindings, ignoring shadowed entries in the finite map. *)
 Definition liveb (r : fmap epoch) e :=

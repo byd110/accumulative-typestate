@@ -65,24 +65,11 @@ Proof.
   change (table_certified [:: Atom true] && check_program one_class fields aliases = true).
   change (true && check_program one_class fields aliases = true).
   rewrite andTb.
-  unfold check_program, aliases.
-  cbn [paths block List.flat_map List.map List.app List.forallb check_trace check_step
-       check_bind retirable get put andb Nat.eqb List.app].
-  unfold check_bind, retirable; cbn [get andb Nat.eqb List.app].
-  rewrite one_class_viable0.
-  cbn [check_trace check_step check_bind retirable get put andb Nat.eqb List.app].
-  rewrite one_class_viable0.
-  cbn [check_trace check_step get put andb Nat.eqb List.app].
-  rewrite one_class_viable1.
-  cbn [check_trace check_step get put andb Nat.eqb List.app].
-  rewrite one_class_viable1.
-  cbn [check_trace check_step get put andb Nat.eqb List.app].
-  rewrite one_class_viable2.
-  cbn [check_trace check_step get put andb Nat.eqb List.app].
-  rewrite one_class_complete2.
-  cbn [check_trace check_step get put andb Nat.eqb List.app].
-  rewrite one_class_viable2.
-  cbn [check_trace check_step get put andb Nat.eqb List.app].
-  rewrite one_class_complete2.
+  unfold check_program, aliases, block, instrument.
+  repeat (progress (cbn [finish_freeb sequence check_stmt check_step check_bind
+    retirable all_complete get put andb Nat.eqb List.app List.forallb fst];
+    unfold check_bind, retirable, all_complete;
+    cbn [get put andb Nat.eqb List.app List.forallb fst];
+    rewrite ?one_class_viable0 ?one_class_viable1 ?one_class_viable2 ?one_class_complete2)).
   reflexivity.
 Qed.

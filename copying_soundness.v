@@ -1,4 +1,4 @@
-(* Soundness of optional history copying for the existing raw semantics. *)
+(* Soundness of optional history copying for direct configuration steps. *)
 From Coq Require Import List Arith Bool Lia.
 From Accumulation Require Import syntax trace_languages protocols semantics typestate
   invariants copying_typestate copying_languages.
@@ -242,23 +242,24 @@ Proof.
       * now apply (ci_future HI).
 Qed.
 
-Lemma ci_retire m g V x e : copying_invariant m g V -> get (refs m) x = Some e ->
-  accepts P (classes m (owners m e)) (V e) = true ->
-  copying_invariant (retire m x) (put g x None) V.
+Lemma ci_clear_refs m g V : copying_invariant m g V ->
+  all_complete P g = true -> copying_invariant (clear_refs m) [] V.
 Proof.
-  intros HI Ex HA. destruct (ci_shape HI) as [h HS]. constructor.
-  - exists (put h x None). eapply invariant_retire. exact HS. exact Ex. reflexivity.
-  - intros y. cbn [retire refs classes owners]. destruct (Nat.eq_dec y x) as [->|Hne].
-    + rewrite !get_put_same. reflexivity.
-    + rewrite !get_put_other by exact Hne. apply (ci_agree HI).
+  intros HI HC. constructor.
+  - destruct (ci_shape HI) as [h HS]. exists []. apply invariant_clear_refs with (g := h).
+    exact HS. apply all_complete_spec. intros. reflexivity.
+  - reflexivity.
   - exact (ci_viable HI).
-  - intros d Hd Hdead. cbn [retire refs classes owners next_epoch] in *.
-    destruct (Nat.eq_dec d e) as [->|Hne]. exact HA.
-    apply (ci_retired HI). exact Hd. intros y Ey.
-    destruct (Nat.eq_dec y x) as [->|Hy]. congruence.
-    apply (Hdead y). rewrite get_put_other by exact Hy. exact Ey.
+  - intros e He _. cbn [clear_refs next_epoch classes owners] in *.
+    destruct (liveb (refs m) e) eqn:E.
+    + apply liveb_spec in E. destruct E as [x Ex].
+      eapply (proj1 (all_complete_spec P g) HC). exact (ci_ref x HI Ex).
+    + apply (ci_retired HI He). intros x Ex.
+      assert (L : liveb (refs m) e = true) by (apply liveb_spec; eauto).
+      congruence.
   - exact (ci_future HI).
 Qed.
+
 Lemma ci_store m g V l f t : copying_invariant m g V ->
   l < next_loc m -> t < next_loc m -> classes m t = FT (classes m l) f ->
   copying_invariant (store m l f t) g V.
@@ -272,7 +273,7 @@ Proof.
 Qed.
 
 Theorem copying_preservation m g V i m' g' : copying_invariant m g V ->
-  raw_step i m m' -> check_step_with_copy P FT copy_history i g = Some g' ->
+  primitive_step i m m' -> check_step_with_copy P FT copy_history i g = Some g' ->
   exists V', copying_invariant m' g' V'.
 Proof.
   intros HI HR HC. destruct (ci_shape HI) as [h HS]. destruct HR.
@@ -300,20 +301,64 @@ Proof.
   - cbn [check_step_with_copy check_step] in HC. rewrite (ci_ref x HI H) in HC.
     destruct (viable P (classes m (owners m e)) (V e ++ [a])) eqn:HV. 2: discriminate.
     inversion HC. subst g'. eexists. eapply ci_emit. exact HI. exact H. exact HV.
-  - cbn [check_step_with_copy check_step] in HC. rewrite (ci_ref x HI H) in HC.
-    destruct (accepts P (classes m (owners m e)) (V e)) eqn:HA. 2: discriminate.
-    inversion HC. subst g'. exists V. eapply ci_retire. exact HI. exact H. exact HA.
+  - cbn [check_step_with_copy check_step] in HC.
+    destruct (all_complete P g) eqn:HA. 2: discriminate.
+    inversion HC. subst g'. exists V. now apply ci_clear_refs with (g := g).
 Qed.
 
-Lemma copying_trace_preservation m g V is m' g' : copying_invariant m g V ->
-  execution is m m' -> check_trace_with_copy P FT copy_history is g = Some g' ->
-  exists V', copying_invariant m' g' V'.
+Lemma copying_typed_primitive_inv g i g' m m' :
+  primitive_step i m m' -> typed_stmt_with_copy P FT copy_history g i g' ->
+  type_step_with_copy P FT copy_history g i g'.
+Proof. intros HR HT. destruct HR; inversion HT; subst; assumption. Qed.
+
+Theorem copying_step_preservation m s m' s' g V gf :
+  raw_step (m,s) (m',s') -> copying_invariant m g V ->
+  typed_stmt_with_copy P FT copy_history g s gf ->
+  exists g' V', copying_invariant m' g' V' /\
+    typed_stmt_with_copy P FT copy_history g' s' gf.
 Proof.
-  intros HI HE. revert g V HI g'. induction HE.
-  - intros g V HI g' HC. simpl in HC. inversion HC. subst. now exists V.
-  - intros g V HI g' HC. simpl in HC.
-    destruct (check_step_with_copy P FT copy_history i g) as [gm|] eqn:HT. 2: discriminate.
-    destruct (copying_preservation HI H HT) as [W HW]. eapply IHHE. exact HW. exact HC.
+  intros HR. remember (m,s) as c eqn:Ec. remember (m',s') as d eqn:Ed.
+  revert m s m' s' Ec Ed g V gf. induction HR; intros m0 s0 m1 s1 Ec Ed g V gf HI HT;
+    inversion Ec; inversion Ed; subst.
+  - pose proof (copying_typed_primitive_inv H HT) as HP.
+    apply check_step_with_copy_complete in HP.
+    destruct (copying_preservation HI H HP) as [W HW].
+    exists gf, W. split. exact HW. apply copy_type_skip.
+  - inversion HT; subst.
+    + match goal with H : type_step_with_copy _ _ _ _ (Seq _ _) _ |- _ => inversion H end.
+    + match goal with Hleft : typed_stmt_with_copy _ _ _ _ s _ |- _ =>
+        destruct (IHHR _ _ _ _ eq_refl eq_refl _ _ _ HI Hleft) as [gn [W [HW Ht]]] end.
+      exists gn, W. split. exact HW. eapply copy_type_seq; eauto.
+  - inversion HT; subst.
+    + match goal with H : type_step_with_copy _ _ _ _ (Seq _ _) _ |- _ => inversion H end.
+    + match goal with Hleft : typed_stmt_with_copy _ _ _ _ Skip _ |- _ => inversion Hleft; subst end.
+      * match goal with H : type_step_with_copy _ _ _ _ Skip _ |- _ => inversion H end.
+      * eexists; exists V. split; eassumption.
+Qed.
+
+Corollary copying_context_preservation E m s m' s' g V gf :
+  raw_step (m,s) (m',s') -> copying_invariant m g V ->
+  typed_stmt_with_copy P FT copy_history g (plug E s) gf ->
+  exists g' V', copying_invariant m' g' V' /\
+    typed_stmt_with_copy P FT copy_history g' (plug E s') gf.
+Proof.
+  intros HR HI HT. eapply copying_step_preservation.
+  - apply raw_step_context. exact HR.
+  - exact HI.
+  - exact HT.
+Qed.
+
+Theorem copying_execution_preservation c d g V gf :
+  execution c d -> copying_invariant (fst c) g V ->
+  typed_stmt_with_copy P FT copy_history g (snd c) gf ->
+  exists g' V', copying_invariant (fst d) g' V' /\
+    typed_stmt_with_copy P FT copy_history g' (snd d) gf.
+Proof.
+  intros HE. revert g V gf. induction HE; intros g V gf HI HT.
+  - exists g, V. auto.
+  - destruct c as [m s], d as [m' s']. simpl in *.
+    destruct (copying_step_preservation H HI HT) as [gm [W [HW Ht]]].
+    eapply IHHE; eauto.
 Qed.
 
 Lemma copying_invariant_prefix m g V : copying_invariant m g V ->
@@ -346,20 +391,20 @@ Theorem copying_program_prefix_sound s m :
   check_program_with_copy P FT copy_history s = true -> program_prefix s initial_machine m ->
   forall l, l < next_loc m -> prefix_language (protocol P (classes m l)) (object_history m l).
 Proof.
-  intros HC [p [q [HP HE]]] l Hl.
-  destruct (check_program_with_copy_path P FT copy_history HC HP) as [g [HG Hempty]].
-  rewrite check_trace_with_copy_app in HG.
-  destruct (check_trace_with_copy P FT copy_history p []) as [gm|] eqn:HT. 2: discriminate.
-  destruct (copying_trace_preservation ci_initial HE HT) as [V HV].
-  eapply copying_invariant_prefix. exact HV. exact Hl.
+  intros HC [_ [t HE]] l Hl.
+  apply check_program_with_copy_spec in HC. destruct HC as [_ HT].
+  destruct (copying_execution_preservation HE ci_initial HT) as [g [V [HI Ht]]].
+  eapply copying_invariant_prefix. exact HI. exact Hl.
 Qed.
 Theorem copying_program_completion_sound s m :
   check_program_with_copy P FT copy_history s = true -> program_execution s initial_machine m ->
   forall l, l < next_loc m -> protocol P (classes m l) (object_history m l).
 Proof.
-  intros HC [p [HP HE]] l Hl.
-  destruct (check_program_with_copy_path P FT copy_history HC HP) as [g [HG Hempty]].
-  destruct (copying_trace_preservation ci_initial HE HG) as [V HV].
-  eapply copying_invariant_complete. exact HV. exact Hempty. exact Hl.
+  intros HC [_ HE] l Hl.
+  apply check_program_with_copy_spec in HC. destruct HC as [_ HT].
+  destruct (copying_execution_preservation HE ci_initial HT) as [g [V [HI Ht]]].
+  cbn in Ht. inversion Ht; subst.
+  - match goal with H : type_step_with_copy _ _ _ _ Skip _ |- _ => inversion H end.
+  - eapply copying_invariant_complete. exact HI. reflexivity. exact Hl.
 Qed.
 End CopyingSoundness.

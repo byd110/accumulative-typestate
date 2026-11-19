@@ -6,7 +6,7 @@ arguments, presentation refinements, and implementation boundaries. The map is
 about the current source declarations. Build and reproduction instructions are
 in [README.md](README.md).
 
-**The main result is an end-to-end trace guarantee.** Successful regular-seed
+**The main result is an end-to-end execution guarantee.** Successful regular-seed
 certification and successful core client checking imply viability of every
 allocated object's history at every executable prefix and acceptance of each
 history at a completed execution. Optional history inheritance has the same
@@ -17,7 +17,7 @@ For the fixed baseline core checker,
 the converse also holds: completion soundness for all accepted clients implies
 shuffle closure of every class protocol. Here necessity and the iff result
 concern **raw completion soundness**, not completion of successful monitored
-runs, whose exit guard enforces acceptance by definition. The new monitor proves
+runs, whose exit guard enforces acceptance by definition. The monitor proves
 certification implies error freedom and execution equivalence; a converse for
 monitored error freedom is not asserted or mechanized here.
 
@@ -39,29 +39,33 @@ LaTeX labels identify paper results independently of their printed numbering.
 
 ## Claim extraction and traceability
 
-### Runtime-monitor extension
+### Direct execution and its correspondences
 
-These results formalize the runtime checks requested for Section 6, while
-preserving the original raw theorems. Guards inspect aggregate object histories;
-the static checker continues to track independent binding histories.
+Source programs contain no `Finish`; `instrument` appends it once. Both raw and
+monitored execution reduce configurations containing a machine and the remaining
+statement. Structural typing uses one environment at every program point.
 
 | Claim | Evidence | Verdict and boundary |
 | --- | --- | --- |
-| Allocation checks empty-history viability; calls check the updated receiver history, with explicit failure outcomes. | `runtime_guard`, `monitored_step`, [`runtime_call_guard`](#declaration-runtime-call-guard); `empty_protocol_allocation_errors`, `invalid_call_monitor_errors` | PROVEN for the core. Failed guards produce `ProtocolError`; undefined ordinary accesses retain the raw semantics' lack of a step. |
-| Program exit checks completion for every allocated object, including unreachable objects. | [`runtime_exit_check_spec`](#declaration-runtime-exit-check-spec), `incomplete_retired_object_program_errors` | PROVEN. The final check occurs once at the selected path's end, not at each `Finish x`. |
-| Individual retirement preserves the aggregate completion predicate. | [`runtime_exit_check_retire`](#declaration-runtime-exit-check-retire), `individual_finish_allows_other_incomplete_object` | PROVEN. Checking the final predicate before or after retirements gives the same Boolean result. This does not formalize full surface instrumentation. |
-| Accepted baseline and inherited-history programs cannot signal protocol errors. | [`baseline_runtime_no_error`](#declaration-baseline-runtime-no-error), [`copying_runtime_no_error`](#declaration-copying-runtime-no-error) | PROVEN under ordinary shuffle certification or mode-aware certification respectively. Both rely on raw prefix/completion soundness rather than assuming the guards. |
-| Adding the monitor preserves exactly the successful complete executions of accepted programs. | [`baseline_runtime_equivalence`](#declaration-baseline-runtime-equivalence), [`copying_runtime_equivalence`](#declaration-copying-runtime-equivalence) | PROVEN in both directions with identical final core machines. Explicit accepted monitored runs establish nonvacuity. Initialization progress and general termination remain outside the result. |
-
-The paper's bulk `finish` and automatic insertion still require a separate
-source-to-core translation. The monitor closes the explicit runtime-error gap
-for the existing core; it does not claim to close the regex/environment-set or
-bulk-instrumentation correspondence gaps listed below.
+| Public execution uses direct statements, evaluation contexts, terminal `Skip`, and sequencing. | `raw_step`, `execution`, `raw_step_decompose`, `raw_step_context`, `execution_context` | PROVEN. No path enumeration or branch constructor is part of the supported language. |
+| Source instrumentation appends exactly one bulk exit after source execution. | [`instrument_single_exit`](#declaration-instrument-single-exit), [`source_execution_iff`](#declaration-source-execution-iff), [`source_execution_no_early_exit`](#declaration-source-execution-no-early-exit) | PROVEN for finish-free sources. Exit preserves the event log and every object's history. |
+| Bulk static completion inspects current bindings and preserves retired obligations. | [`all_complete_spec`](#declaration-all-complete-spec), [`invariant_clear_refs`](#declaration-invariant-clear-refs), [`ci_clear_refs`](#declaration-ci-clear-refs) | PROVEN. Obsolete association-list entries impose no additional completion obligation. |
+| Both class/history checkers implement their expression rules. | [`residual_checker_correspondence`](#declaration-residual-checker-correspondence), [`residual_program_correspondence`](#declaration-residual-program-correspondence), [`regular_residual_program_correspondence`](#declaration-regular-residual-program-correspondence), [`copying_residual_program_correspondence`](#declaration-copying-residual-program-correspondence), [`copying_regular_residual_program_correspondence`](#declaration-copying-regular-residual-program-correspondence) | PROVEN for related input environments and a correct initial expression per class; the regular-seed instance discharges that representation premise. The converse does not represent arbitrary expressions as class histories. |
+| Reachable configurations carry a corresponding residual expression environment. | [`reachable_residual_configuration`](#declaration-reachable-residual-configuration), [`copying_reachable_residual_configuration`](#declaration-copying-reachable-residual-configuration), [`regular_reachable_residual_configuration`](#declaration-regular-reachable-residual-configuration), [`copying_regular_reachable_residual_configuration`](#declaration-copying-regular-reachable-residual-configuration) | PROVEN. A canonical derivative expression for each history preserves literal empty output typing. Live views have nonempty residuals and retired views are complete. Inherited views retain the continuation invariant instead of being identified with disjoint event histories. |
+| Epoch bookkeeping can be erased and reconstructed for arbitrary fresh surface locations. | [`ghost_surface_execution`](#declaration-ghost-surface-execution), [`surface_ghost_execution`](#declaration-surface-ghost-execution), [`represents_extensional`](#declaration-represents-extensional) | PROVEN in both directions with an injective renaming on allocated locations. Map observations are extensional; no equality of association-list encodings or literal final location names is asserted. |
+| Surface and ghost executions have the same all-object prefix and final properties. | [`ghost_surface_prefix_safety`](#declaration-ghost-surface-prefix-safety), [`ghost_surface_completion_safety`](#declaration-ghost-surface-completion-safety) | PROVEN for every allocated object, including unreachable ones. Ordinary initialization and termination remain outside the theorem. |
+| Allocation checks empty-history viability; calls check the updated receiver history. | `runtime_guard`, `monitored_step`, [`runtime_call_guard`](#declaration-runtime-call-guard) | PROVEN. Failed guards produce `ProtocolError`; undefined ordinary accesses have no primitive step. |
+| The single bulk `Finish` checks every allocated object's completion. | [`runtime_exit_check_spec`](#declaration-runtime-exit-check-spec), [`runtime_exit_check_clear`](#declaration-runtime-exit-check-clear) | PROVEN. The guard is part of the instrumented primitive; there is no additional program-boundary guard. |
+| Guarded surface executions and errors agree with the ghost monitor. | [`runtime_surface_guard`](#declaration-runtime-surface-guard), [`ghost_surface_monitored_execution`](#declaration-ghost-surface-monitored-execution), [`surface_ghost_monitored_execution`](#declaration-surface-ghost-monitored-execution), [`ghost_surface_error_equivalence`](#declaration-ghost-surface-error-equivalence) | PROVEN for independently defined guarded surface rules, with the same location-renaming boundary as raw simulation. |
+| Surface source programs retain safety, completion, monitor equivalence, and baseline necessity. | [`surface_typestate_prefix_sound`](#declaration-surface-typestate-prefix-sound), [`surface_typestate_completion_sound`](#declaration-surface-typestate-completion-sound), [`surface_copying_prefix_sound`](#declaration-surface-copying-prefix-sound), [`surface_copying_completion_sound`](#declaration-surface-copying-completion-sound), [`surface_completion_sound_iff_certified`](#declaration-surface-completion-sound-iff-certified) | PROVEN. Necessity quantifies over raw surface completion; it is not a consequence of the monitored exit guard. |
+| Protocol errors propagate through evaluation contexts and are terminal. | [`monitored_error_context`](#declaration-monitored-error-context), [`monitored_error_terminal`](#declaration-monitored-error-terminal) | PROVEN. The remaining continuation does not execute after an error. |
+| Accepted baseline and inherited-history programs cannot signal protocol errors. | [`baseline_runtime_no_error`](#declaration-baseline-runtime-no-error), [`copying_runtime_no_error`](#declaration-copying-runtime-no-error) | PROVEN under ordinary or mode-aware certification, using raw prefix/completion soundness. |
+| Restoring guards preserves accepted final executions and reachable residual configurations. | [`baseline_runtime_equivalence`](#declaration-baseline-runtime-equivalence), [`copying_runtime_equivalence`](#declaration-copying-runtime-equivalence), [`baseline_runtime_prefix_equivalence`](#declaration-baseline-runtime-prefix-equivalence), [`copying_runtime_prefix_equivalence`](#declaration-copying-runtime-prefix-equivalence) | PROVEN in both directions with the same ghost machine and residual statement. |
 
 ### Earlier language and checker results
 
 The first table paraphrases the formal claims from the current abstract,
-introduction, contribution list, and conclusion. Repeated claims remain visible
+introduction, contribution list, mechanization section, and conclusion. Repeated claims remain visible
 so that an abstract-level statement can be checked without inferring its intended
 scope from the body. The next table covers every numbered lemma, proposition, and
 theorem in the technical development. Paper links identify source files, with
@@ -71,28 +75,31 @@ line numbers. The first table's paraphrases are not verbatim quotations.
 | Claim and source | Current paper claim (paraphrased) | Evidence | Verdict | Exact scope or gap |
 | --- | --- | --- | --- | --- |
 | A1 [Abstract](../paper/abstract.tex) | Alias tracking can be omitted when operations through one reference preserve permissions established through other references to the same object. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound) | PROVEN, scoped | The formal result is for the specified independent-history checker and certified protocol family, not an arbitrary analysis satisfying an informal persistence description. |
-| A2 [Abstract](../paper/abstract.tex) | The paper formalizes a checker that tracks references independently and gives a necessary and sufficient protocol condition for that checking discipline. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the core | For this fixed baseline checker, raw all-object completion soundness holds exactly when every class protocol is shuffle closed. Paper-to-core surface correspondence remains separate. This does not characterize all analyses without aliases. |
+| A2 [Abstract](../paper/abstract.tex) | The paper formalizes a checker that tracks references independently and gives a necessary and sufficient protocol condition for that checking discipline. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the core | For this fixed baseline checker, raw all-object completion soundness holds exactly when every class protocol is shuffle closed. Source instrumentation and raw ghost/surface correspondence are proved below. This does not characterize all analyses without aliases. |
 | A3 [Abstract](../paper/abstract.tex) | Calls through aliases interleave into one object history. Every interleaving of permitted complete histories must therefore remain permitted. | [`project_partition`](#declaration-project-partition), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed), [`invariant_object_language`](#declaration-invariant-object-language) | PROVEN | Fresh epoch histories partition actual calls. Inherited histories instead use completing continuations. They do not form this partition. |
 | A4 [Abstract](../paper/abstract.tex) | Regular expressions describe representative histories from which candidate protocols are constructed. A decision procedure certifies shuffle closedness or returns a counterexample. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`closure_regex_correct`](#declaration-closure-regex-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | Finite regular-expression input, finite inhabited alphabet for the pumping relation. Total Rocq definitions give termination. No practical runtime bound is claimed. |
 | A5 [Abstract](../paper/abstract.tex) | The paper connects its condition to accumulation analysis and gives a supported protocol whose safe histories violate the accumulation condition. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed), [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | PROVEN, scoped | The bridge extracts a first-error trace law and interprets non-error as extendibility to completion. It does not formalize the other analysis or compare accepted client programs. |
-| A6 [Abstract](../paper/abstract.tex) | For accepted programs, execution remains safe and every allocated object’s history is accepted at termination. | [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN, scoped | Accepted instrumented core programs. Completed execution is a premise. Explicit Finish x and the model boundaries below apply. Initialization progress and termination are not conclusions. |
-| A7 [Abstract](../paper/abstract.tex) | The Rocq development has approximately 5,700 lines of definitions and proofs and verifies the language constructions, certification procedures, and core checker soundness without additional axioms. | [audit.v](audit.v), `coqwc *.v`, [build instructions](README.md) | PROVEN for audited results / SOURCE/BUILD FACT for size | The line count is a reproducible size report, not a theorem. Principal theorem assumption reports establish the no-additional-axioms claim. Optional minimal-corpus results use classical logic. |
-| I1 [Introduction, `sec:intro`](../paper/introduction.tex) | The sequential checker tracks each binding’s local history. Baseline assignment starts a fresh history, calls update only the receiver and require viability, and each binding must complete before it is discarded or the program exits. | [`check_step_sound`](#declaration-check-step-sound), [`check_step_complete`](#declaration-check-step-complete), [`check_trace_spec`](#declaration-check-trace-spec) | PROVEN | See the primitive-rule comparison below. Completion of a single alias does not discharge other bindings. |
+| A6 [Abstract](../paper/abstract.tex) | For accepted programs, execution remains safe and every allocated object’s history is accepted at termination. | [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN, scoped | Accepted source programs, with a single automatically instrumented bulk exit. Completed execution is a premise. Initialization progress and termination are not conclusions. |
+| A7 [Abstract](../paper/abstract.tex) | The Rocq development verifies the language constructions, certification procedures, and core checker soundness without additional axioms. | [audit.v](audit.v), `coqwc *.v`, [build instructions](README.md) | PROVEN for audited results / SOURCE/BUILD FACT for size | The line count is a reproducible size report, not a theorem. Principal theorem assumption reports establish the no-additional-axioms claim. Optional minimal-corpus results use classical logic. |
+| I1 [Introduction, `sec:intro`](../paper/introduction.tex) | The sequential checker tracks each binding’s local history. Baseline assignment starts a fresh history, calls update only the receiver and require viability, and each binding must complete before it is discarded or the program exits. | [`check_step_sound`](#declaration-check-step-sound), [`check_step_complete`](#declaration-check-step-complete), [`check_stmt_spec`](#declaration-check-stmt-spec) | PROVEN | See the primitive-rule comparison below. Completion of a single alias does not discharge other bindings. |
 | I2 [Introduction, `sec:intro`](../paper/introduction.tex) | For any nonempty regular shuffle-closed protocol, accepted programs are safe at every execution prefix, and all allocated objects have complete histories at termination, including unreachable objects. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound) | PROVEN, scoped | The quantified locations satisfy l < next_loc m, with no reachability restriction. |
 | I3 [Introduction, `sec:intro`](../paper/introduction.tex) | Shuffle closedness is necessary for the stated discipline, which accepts every locally valid history. | [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified) | PROVEN, scoped | The converse constructs a baseline two-binding client for arbitrary complete histories and their chosen interleaving. It concerns this fixed checker, not every checker without alias information. |
-| I4 [Introduction, `sec:intro`](../paper/introduction.tex) | Pumping closure preserves regularity for arbitrary regular seed languages. An exact condition on seeds yields a terminating certification procedure with counterexamples given by seed histories and their interleavings. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | Regular languages are given by expressions. The mechanized pumping representation uses a finite inhabited alphabet. The mathematical empty-alphabet case is discussed separately. |
+| I4 [Introduction, `sec:intro`](../paper/introduction.tex) | Pumping closure preserves regularity for arbitrary regular seed languages. An exact condition on seeds yields a terminating certification procedure with counterexamples given by seed histories and their interleavings. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound), [`shuffle_candidates_spec`](#declaration-shuffle-candidates-spec), [`counterexample` selection and `List.find_some`](#declaration-counterexample-selection) | PROVEN, including a consequence of the selection definition | The returned histories belong to the normalized seed corpus by List.find_some and shuffle_candidates_spec. The exported regex_counterexample_sound signature states only membership in the pumping closure. Regular inputs and an inhabited finite alphabet are required; the mathematical empty-alphabet case is discussed separately. |
 | I5 [Introduction, `sec:intro`](../paper/introduction.tex) | For selected classes, assignment may inherit the source history under a stronger certificate for composing continuations. This optional rule preserves prefix safety and all-object completion. | [`copy_step_spec`](#declaration-copy-step-spec), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound), [`certify_copying_regex_spec`](#declaration-certify-copying-regex-spec) | PROVEN, scoped | copying_certified requires ordinary shuffle closure for every class and residual shuffle closure for enabled classes. Allocation and field loading stay fresh. Target retirement is still required. |
 | I6 [Introduction, `sec:intro`](../paper/introduction.tex) | Interpreting safe histories as extendible to completion connects accumulation to composition of continuations. The accumulation condition and a separate completion condition imply the certificates for both modes. A shuffle-closed protocol violates the accumulation condition, giving a language-level separation. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed), [`kellogg_regular_certificates`](#declaration-kellogg-regular-certificates), [`kellogg_protocol_copying_certified`](#declaration-kellogg-protocol-copying-certified), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | PROVEN, scoped | Completion stability is a distinct sufficient premise. The safety equivalence concerns derivatives of prefix_language K, not derivatives of K. |
-| I7 [Introduction, contribution 1, `sec:intro`](../paper/introduction.tex) | The first contribution is an independent-reference typestate system, its exact protocol condition, prefix-safety and completion guarantees, and an optional history-inheritance rule. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | WEAKER | The core guarantees and baseline necessity are proven. The paper-to-core instrumentation and residual-environment correspondence remain paper-level. |
+| I7 [Introduction, contribution 1, `sec:intro`](../paper/introduction.tex) | The first contribution is an independent-reference typestate system, its exact protocol condition, prefix-safety and completion guarantees, and an optional history-inheritance rule. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | PROVEN, scoped | The direct source calculus, baseline necessity, automatic bulk exit, expression representations in both modes, and ghost/surface simulation are proved. Ordinary initialization and termination remain separate. |
 | I8 [Introduction, contribution 2, `sec:intro`](../paper/introduction.tex) | The second contribution constructs certified protocols from regular seed specifications through regularity-preserving pumping closure and an exact, terminating seed criterion that returns counterexamples on failure. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`seed_shuffle_coveredP`](#declaration-seed-shuffle-coveredP), [`base_shuffle_coveredP`](#declaration-base-shuffle-coveredP), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | The signature restrictions on alphabets and seed predicates are listed below. |
 | I9 [Introduction, contribution 3, `sec:intro`](../paper/introduction.tex) | The third contribution connects accumulation analysis to both checking modes through sufficient safety and completion conditions, and gives a certified protocol outside the accumulation condition. | [`kellogg_program_prefix_sound`](#declaration-kellogg-program-prefix-sound), [`kellogg_program_completion_sound`](#declaration-kellogg-program-completion-sound), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | PROVEN, scoped | The connection is semantic, under the extracted first-error interpretation and separate completion premise. |
-| I10 [Introduction, contribution 4, `sec:intro`](../paper/introduction.tex) | The fourth contribution mechanizes the language constructions, certificates, accumulation connection, and core checker soundness in Rocq. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`kellogg_regular_certificates`](#declaration-kellogg-regular-certificates), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound) | PROVEN | The cited Rocq modules implement this chain. |
-| I11 [Introduction, `sec:intro`](../paper/introduction.tex) | The principal Rocq theorems connect successful certification to prefix safety and completion in the core calculus without additional axioms. | [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN | See audit.v and the trust boundary below. Generalized protocol/certification hypotheses remain explicit inputs. |
-| I12 [Introduction, `sec:intro`](../paper/introduction.tex) | The Rocq development has approximately 5,700 project definition and proof lines, excluding bundled RegLang, and builds on Mathematical Components. | `coqwc *.v`, [build instructions](README.md) | SOURCE/BUILD FACT | The approximate count concerns project definitions and proofs, excluding bundled RegLang. It is not a mechanized mathematical claim. |
-| C1 [Conclusion, `sec:conclusion`](../paper/body.tex) | Pumping closure constructs regular protocols from regular seed specifications. A finite seed criterion decides shuffle closedness of the result. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`certify_regex_spec`](#declaration-certify-regex-spec) | PROVEN | Same regular-language and alphabet scope as A4. |
-| C2 [Conclusion, `sec:conclusion`](../paper/body.tex) | Shuffle closedness characterizes sound composition for the baseline checker. Accepted programs preserve viable object histories at every prefix and complete every allocated object at termination. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the core | Checker environments store class/history pairs. The equivalence is specific to the baseline checker. Paper-to-core correspondence remains separate. |
-| C3 [Conclusion, `sec:conclusion`](../paper/body.tex) | An optional stronger certificate allows assignment to inherit source histories while completion checks remain independent. Every reachable derivative must be shuffle closed. | [`certify_residuals_spec`](#declaration-certify-residuals-spec), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | PROVEN | All prefixes induce reachable DFA states. The certificate includes the initial derivative. Empty derivatives satisfy closure vacuously. |
-| C4 [Conclusion, `sec:conclusion`](../paper/body.tex) | The accumulation bridge supplies sufficient semantic premises for both checker modes. | [`kellogg_protocol_copying_certified`](#declaration-kellogg-protocol-copying-certified), [`kellogg_program_prefix_sound`](#declaration-kellogg-program-prefix-sound), [`kellogg_program_completion_sound`](#declaration-kellogg-program-completion-sound) | PROVEN | The bridge adds no executable decision procedure for its semantic premises. |
+| I10 [Introduction, contribution 4, `sec:intro`](../paper/introduction.tex) | The fourth contribution mechanizes the language constructions, certificates, accumulation connection, and core checker soundness in Rocq, with details in the Mechanization section. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`kellogg_regular_certificates`](#declaration-kellogg-regular-certificates), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound) | PROVEN | The cited Rocq modules implement this chain. |
+| M1 [Mechanization, `sec:mechanization`](../paper/mechanization.tex) | The development verifies language constructions, finite certificates and rejection witnesses, the accumulation bridge, and both checker modes, connecting successful certification and checking to safety and completion. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound), [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN, scoped | Regular-seed certification discharges the protocol premises for the fixed core checkers. Initialization progress and termination remain outside the guarantees. |
+| M2 [Mechanization, `sec:mechanization`](../paper/mechanization.tex) | The executable checkers agree with the declarative rules and have proved correspondences to regular-expression qualifiers and surface semantics. | [`check_stmt_spec`](#declaration-check-stmt-spec), [`copy_step_spec`](#declaration-copy-step-spec), [`regular_residual_program_correspondence`](#declaration-regular-residual-program-correspondence), [`copying_regular_residual_program_correspondence`](#declaration-copying-regular-residual-program-correspondence), [`ghost_surface_execution`](#declaration-ghost-surface-execution), [`surface_ghost_execution`](#declaration-surface-ghost-execution) | PROVEN, scoped | Expression correspondences use related environments and a correct initial expression per class. Ghost/surface simulation uses an injective location renaming and extensional map observations. |
+| M3 [Mechanization, `sec:mechanization`](../paper/mechanization.tex), formerly I11 | The principal construction, certification, and client-soundness theorems require no additional axioms. | [audit.v](audit.v), [assumption-audit instructions](README.md) | PROVEN for audited results | See the trust boundary below. Generalized protocol/certification hypotheses remain explicit inputs. Optional minimal-corpus results use classical logic and are outside the audited dependency closure. |
+| M4 [Mechanization, `sec:mechanization`](../paper/mechanization.tex), formerly part of I12 | The development builds on Mathematical Components and RegLang. | [dependency and build instructions](README.md), [artifact guide](../paper/ARTIFACT_README.md) | SOURCE/BUILD FACT | RegLang is bundled. The former introductory size claim remains in the abstract (A7) and artifact guide: the documented count is 8,033 project definition/proof lines across 37 sources, excluding the 12 bundled RegLang sources. Size is not a mathematical theorem or a claim in the new Mechanization section. |
+| C1 [Conclusion, `sec:conclusion`](../paper/body.tex) | Candidate protocols are constructed from representative seed specifications and certified by a finite procedure with counterexamples on failure. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | Same regular-language and alphabet scope as A4. Certification, rather than construction alone, establishes shuffle closure. |
+| C2 [Conclusion, `sec:conclusion`](../paper/body.tex) | Permitted complete histories must remain permitted when interleaved for the fresh-history discipline to check shared objects reference by reference. Accepted programs preserve viable object histories throughout execution and complete them at normal termination. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | PROVEN for the core | The necessary-and-sufficient condition concerns the fixed fresh-history checker and raw all-object completion soundness. Both modes have the stated prefix and final guarantees under their respective certificates; completed execution remains a premise. |
+| C3 [Conclusion, `sec:conclusion`](../paper/body.tex) | Stronger protocol conditions allow progress to be inherited at assignment. | [`certify_residuals_spec`](#declaration-certify-residuals-spec), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | PROVEN | Every reachable derivative must be shuffle closed. The certificate includes the initial derivative; empty derivatives satisfy closure vacuously. Allocation and field loads remain fresh. |
+| C4 [Conclusion, `sec:conclusion`](../paper/body.tex) | The paper relates both checking modes to accumulation analysis and exhibits a protocol that supports fresh histories but violates the accumulation condition. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed), [`kellogg_protocol_copying_certified`](#declaration-kellogg-protocol-copying-certified), [`kellogg_program_prefix_sound`](#declaration-kellogg-program-prefix-sound), [`kellogg_program_completion_sound`](#declaration-kellogg-program-completion-sound), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | PROVEN, scoped | The equivalence concerns accumulation safety for viable prefixes. The bridge to complete histories also assumes completion stability. The separating witness compares protocol languages, not accepted client programs or implementations. |
+| C5 [Conclusion, `sec:conclusion`](../paper/body.tex) | The Rocq mechanization verifies the constructions and soundness results. | M1–M3 above | PROVEN, scoped | This summarizes the verified results with their stated model, representation, and trust boundaries; it does not assert readiness as a reusable software library. |
 
 ### Numbered formal results
 
@@ -105,19 +112,19 @@ normalizing line breaks for the table.
 | [lem:singleton](../paper/regularity.tex)<br>For every seed $s$, $\denote{C(s)}=\pc{\set{s}}$. | [`pumping_closure_singleton_correct`](#declaration-pumping-closure-singleton-correct) | PROVEN | Repeated seed milestones remain distinct occurrences. The formal representation takes char:finType and d0:char. |
 | [lem:star-basis](../paper/regularity.tex)<br>For every regular expression $r$ over $\Sigma$, with $k=&#124;\Sigma&#124;$, $\pc{\denote{r^*}}=\pc{\denote{B_k(r)}}$. | [`pumping_closure_star_finite_basis`](#declaration-pumping-closure-star-finite-basis) | PROVEN | bounded_star_basis uses the alphabet cardinality, bounding factor count rather than factor lengths. |
 | [thm:normalization](../paper/regularity.tex)<br>For every regular expression $r$, $F(r)$ is finite and<br>\[<br>\pc{\denote{r}}=\pc{F(r)}.<br>\] | [`eliminate_star_correct`](#declaration-eliminate-star-correct), [`eliminate_star_star_free`](#declaration-eliminate-star-star-free), [`star_free_finite`](#declaration-star-free-finite), [`words_of_star_free_correct`](#declaration-words-of-star-free-correct), [`pumping_normalize_correct`](#declaration-pumping-normalize-correct) | PROVEN | F(r) is represented by words_of_star_free (eliminate_star r). Closure equality, not equality of original seed languages or minimality, is proved. |
-| [thm:regularity](../paper/regularity.tex)<br>Algorithm~\ref{alg:construct} terminates on every regular expression $r$ and returns a finite set $F$ and a regular expression $P$ such that<br>\[<br>F=F(r),\qquad \denote{P}=\pc{F}=\pc{\denote{r}}.<br>\]<br>Consequently, pumping closure preserves regularity. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`closure_regex_correct`](#declaration-closure-regex-correct), [`pumping_normalize_correct`](#declaration-pumping-normalize-correct) | PROVEN | Total enumeration and closure_regex provide the finite witness and expression. The regularity theorem alone states existence of a recognizing automaton. Empty alphabet remains a paper-level edge case of the default-symbol representation. |
+| [thm:regularity](../paper/appendix.tex)<br>Algorithm~\ref{alg:construct} terminates on every regular expression $r$ and returns a finite set $F$ and a regular expression $P$ such that<br>\[<br>F=F(r),\qquad \denote{P}=\pc{F}=\pc{\denote{r}}.<br>\]<br>Consequently, pumping closure preserves regularity. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`closure_regex_correct`](#declaration-closure-regex-correct), [`pumping_normalize_correct`](#declaration-pumping-normalize-correct) | PROVEN | Total enumeration and closure_regex provide the finite witness and expression. The regularity theorem alone states existence of a recognizing automaton. Empty alphabet remains a paper-level edge case of the default-symbol representation. |
 | [lem:pump-shuffle](../paper/shuffle.tex)<br>If $u\pumpsto u'$ and $\interleave{u'}{v}{w'}$, there exists $w$ such that $\interleave{u}{v}{w}$ and $w\pumpsto w'$.<br>The symmetric statement holds for a step in the right input. | [`pumping_interleaving_left`](#declaration-pumping-interleaving-left), [`pumping_interleaving_right`](#declaration-pumping-interleaving-right) | PROVEN | The removed occurrence retains an earlier source occurrence, not merely the same symbol somewhere in the word. |
 | [lem:factorization](../paper/shuffle.tex)<br>If $s\pumpsto^*u$, $t\pumpsto^*v$, and $\interleave{u}{v}{w}$, then<br>\[<br>\exists z.\ \interleave{s}{t}{z}\ \land\ z\pumpsto^*w.<br>\] | [`seed_cover_interleaving_factor`](#declaration-seed-cover-interleaving-factor) | PROVEN | The output interleaving of originating seeds pumps to the full output. Original milestones are not discarded. |
 | [thm:seed-criterion](../paper/shuffle.tex)<br>For every seed language $S$,<br>\[<br>\text{$S$ satisfies the seed-shuffle condition}<br>\quad\Longleftrightarrow\quad<br>\text{$\pc{S}$ is shuffle closed}.<br>\] | [`seed_shuffle_coveredP`](#declaration-seed-shuffle-coveredP), [`base_shuffle_coveredP`](#declaration-base-shuffle-coveredP) | PROVEN, scoped | seed_shuffle_coveredP covers arbitrary Prop-valued seed languages via covered_by. base_shuffle_coveredP connects Boolean seed predicates to the inductive pumping closure. Both use the inhabited finite alphabet disclosed in the paper. The empty-alphabet case is paper-level. |
-| [thm:decision](../paper/shuffle.tex)<br>Applied to $F(r)$, Algorithm~\ref{alg:certify} terminates and accepts exactly when $\pc{\denote{r}}$ is shuffle closed.<br>On rejection, its result $(u,v,z)$ satisfies<br>\[<br>u,v\in\pc{\denote{r}},\qquad<br>\interleave{u}{v}{z},\qquad z\notin\pc{\denote{r}}.<br>\] | [`certify_seeds_spec`](#declaration-certify-seeds-spec), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | certify_regex is Boolean. Regex_counterexample is its separate total diagnostic function. regex_counterexample_none equates witness absence with success. Regex_counterexample_complete proves a witness exists on rejection. |
+| [thm:decision](../paper/appendix.tex)<br>Applied to $F(r)$, Algorithm~\ref{alg:certify} terminates and accepts exactly when $\pc{\denote{r}}$ is shuffle closed.<br>On rejection, its result $(u,v,z)$ satisfies<br>\[<br>u,v\in F(r),\qquad<br>\interleave{u}{v}{z},\qquad z\notin\pc{\denote{r}}.<br>\] | [`certify_seeds_spec`](#declaration-certify-seeds-spec), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound), [`shuffle_candidates_spec`](#declaration-shuffle-candidates-spec), [`counterexample` selection and `List.find_some`](#declaration-counterexample-selection) | PROVEN, including a consequence of the selection definition | certify_regex is Boolean; regex_counterexample is its separate total diagnostic function. Witness absence agrees with success, and rejection yields a witness. Seed membership follows from unfolding regex_counterexample/counterexample, applying List.find_some, and then shuffle_candidates_spec. The exported regex_counterexample_sound signature gives the weaker closure-membership statement for the two inputs, together with interleaving and output rejection. |
 | [lem:prefix-shuffle](../paper/typestate.tex)<br>If $K$ is shuffle closed, then $\pref{K}$ is shuffle closed. | [`prefix_shuffle_closed`](#declaration-prefix-shuffle-closed), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed) | PROVEN | Finite composition requires a nonempty set of component histories, so no premise K [] is needed. |
-| [lem:local](../paper/typestate.tex)<br>Let $s$ be an ordinarily well-typed, initialized program satisfying $\vdash_{\mathrm{prog}}s$.<br>At each execution prefix of $s$ with the protocol checks erased, one of its static environments corresponds to the execution and satisfies:<br>\begin{enumerate}<br>\item If $x$ is live in epoch $e$, $\rho(x)=\lambda(e)$ and $\Gamma(x)=(\kappa(\lambda(e)),R)$ with $\denote{R}=t_e^{-1}K_{\kappa(\lambda(e))}\neq\emptyset$.<br>\item Every retired epoch $e$ has $t_e\in K_{\kappa(\lambda(e))}$.<br>\end{enumerate} | [`preservation`](#declaration-preservation), [`trace_preservation`](#declaration-trace-preservation), [`residual_snoc`](#declaration-residual-snoc), [`residual_nullable`](#declaration-residual-nullable) | PROVEN for the core invariant | The core invariant stores class agreement, heap typing for defined fields, viable live histories, and completed retired histories. Initialization safety is a separate assumption. Matching the paper regex environments, environment sets, and bulk exit requires the unmechanized refinement below. |
-| [lem:object-shuffle](../paper/typestate.tex)<br>With the protocol checks erased, at every runtime prefix and allocated location $\ell$, its history $h(\ell)$ is an interleaving of the histories of all epochs $e$ such that $\lambda(e)=\ell$, including retired epochs. | [`project_partition`](#declaration-project-partition), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed), [`invariant_object_language`](#declaration-invariant-object-language) | PROVEN for fresh histories | object_history is the erasure of the relevant tagged events. Every allocated location has an epoch, including after bindings disappear. There is no separate n-ary shuffle relation. The projection theorem supplies the exact composition fact. |
-| [thm:typestate](../paper/typestate.tex)<br>Let every class protocol $K_C$ be regular and shuffle closed.<br>If an ordinarily well-typed, initialized, closed source program $s$ satisfies $\vdash_{\mathrm{prog}}s$, then, with the runtime protocol checks erased:<br>\begin{enumerate}<br>\item At every execution prefix and allocated location $\ell$, $h(\ell)\in\pref{K_{\kappa(\ell)}}$.<br>\item On normal termination, every allocated object has a complete history: $h(\ell)\in K_{\kappa(\ell)}$, including objects no longer reachable from variables or fields.<br>\end{enumerate}<br>Restoring the checks preserves exactly the completed executions, and no monitored execution reaches $\mathsf{error}$.<br>Executions include the automatically inserted exit operation.<br>The static checker maintains no alias relation. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`baseline_runtime_no_error`](#declaration-baseline-runtime-no-error), [`baseline_runtime_equivalence`](#declaration-baseline-runtime-equivalence) | WEAKER as a source-language theorem | The complete conclusion is proven for the semantic core under certified P and acceptance by the core checker. Nonemptiness is checked when a binding starts, rather than assumed for every class. Bulk finish, automatic exit insertion, and correspondence with regex-valued environment sets remain unmechanized. The core theorems do not establish initialization safety. |
+| [lem:local](../paper/typestate.tex)<br>Let $s$ be an ordinarily well-typed program satisfying $\vdash_{\mathrm{prog}}s$.<br>If $\langle M,s'\rangle$ is reachable from the initial configuration of $s;\code{finish}$, then some $\Gamma$ with $\operatorname{dom}(\Gamma)=\operatorname{dom}(\rho)$ satisfies $\checkstmt{\Gamma}{s'}{\emptyset}$ and:<br>\begin{enumerate}<br>\item If $x$ is live in epoch $e$, $\rho(x)=\lambda(e)$ and $\Gamma(x)=(\kappa(\lambda(e)),R)$ with $\denote{R}=t_e^{-1}K_{\kappa(\lambda(e))}\neq\emptyset$.<br>\item Every retired epoch $e$ has $t_e\in K_{\kappa(\lambda(e))}$.<br>\end{enumerate} | [`preservation`](#declaration-preservation), [`execution_preservation`](#declaration-execution-preservation), [`residual_snoc`](#declaration-residual-snoc), [`residual_nullable`](#declaration-residual-nullable), [`reachable_residual_configuration`](#declaration-reachable-residual-configuration) | PROVEN for the residual configuration invariant | Configuration preservation retains one environment typing the residual statement, class/heap agreement, viable live histories, and completed retired histories. The baseline expression correspondence and bulk-clear invariant connect this representation to the paper. Initialization safety remains separate. |
+| [lem:object-shuffle](../paper/typestate.tex)<br>At every runtime prefix and allocated location $\ell$, its history $h(\ell)$ is an interleaving of the histories of all epochs $e$ such that $\lambda(e)=\ell$, including retired epochs. | [`project_partition`](#declaration-project-partition), [`tagged_shuffle_closed`](#declaration-tagged-shuffle-closed), [`invariant_object_language`](#declaration-invariant-object-language) | PROVEN for fresh histories | object_history is the erasure of the relevant tagged events. Every allocated location has an epoch, including after bindings disappear. There is no separate n-ary shuffle relation. The projection theorem supplies the exact composition fact. |
+| [thm:typestate](../paper/typestate.tex)<br>Let every class protocol $K_C$ be regular and shuffle closed.<br>If an ordinarily well-typed source program $s$ satisfies $\vdash_{\mathrm{prog}}s$, then every execution of $s;\code{finish}$ from the initial state has the following properties:<br>\begin{enumerate}<br>\item It never reaches $\mathsf{error}$.<br>\item At every execution prefix and allocated location $\ell$, $h(\ell)\in\pref{K_{\kappa(\ell)}}$.<br>\item On normal termination, every allocated object has a complete history: $h(\ell)\in K_{\kappa(\ell)}$, including objects no longer reachable from variables or fields.<br>\end{enumerate} | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`baseline_runtime_no_error`](#declaration-baseline-runtime-no-error), [`baseline_runtime_equivalence`](#declaration-baseline-runtime-equivalence) | PROVEN, scoped | The source checker inserts bulk exit and has a baseline expression-rule correspondence. Bidirectional ghost/surface simulation transfers all-object properties. Nonemptiness is checked when a binding starts. The results quantify over executable prefixes and completed runs; initialization safety and termination are not conclusions. |
 | [prop:necessary](../paper/typestate.tex)<br>If arbitrary pairs of complete local histories from $K$ must combine into a complete object history under every interleaving, then $K$ must be shuffle closed. | [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | PROVEN for the baseline core | The formal converse turns raw completion soundness for every accepted baseline core program and execution into certified P. Its proof builds the two-binding client for arbitrary complete histories and a chosen interleaving. No converse for other analyses or the optional copying mode is asserted. |
-| [cor:certified-typestate](../paper/typestate.tex)<br>If Algorithms~\ref{alg:construct} and~\ref{alg:certify} construct and certify every class protocol, an ordinarily well-typed, initialized, closed source program accepted by Algorithm~\ref{alg:client} has the guarantees of Theorem~\ref{thm:typestate}. | [`regular_family_certified`](#declaration-regular-family-certified), [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound) | WEAKER as a source-language corollary | The compiled regular-seed family is certified and composed with the core checker in regular_soundness.v over a finite inhabited alphabet. Certification supplies shuffle closedness, not nonemptiness, which remains a binding check. The paper-level Algorithm 3 and its automatic bulk finish have no mechanized implementation correspondence. |
-| [thm:copying-soundness](../paper/typestate.tex)<br>Assume every class protocol is regular and shuffle closed, and every opted-in class satisfies Equation~\eqref{eq:residual-shuffle}.<br>An ordinarily well-typed, initialized, closed source program satisfying the program judgment with the optional assignment rule has all guarantees of Theorem~\ref{thm:typestate}, including safety with protocol checks erased and absence of runtime protocol errors. | [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound), [`copying_runtime_no_error`](#declaration-copying-runtime-no-error), [`copying_runtime_equivalence`](#declaration-copying-runtime-equivalence) | WEAKER as a source-language theorem | The core result is complete under copying_certified, including nested and mixed copying. Classes using fresh histories require semantic shuffle closedness, while opted-in classes additionally require residual shuffle closedness. It inherits the same paper-to-core correspondence and initialization boundary as thm:typestate. |
-| [thm:accumulation-prefix](../paper/typestate.tex)<br>Suppose $P=\pref{K}$ is decidable.<br>Equation~\eqref{eq:accumulation-error} holds if and only if every derivative $p^{-1}P$ is shuffle closed. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed) | PROVEN | K is arbitrary Prop-valued language over any Type. Decidability of prefix_language K is an explicit hypothesis. No classical axiom supplies it. |
+| [cor:certified-typestate](../paper/appendix.tex)<br>If Algorithms~\ref{alg:construct} and~\ref{alg:certify} construct and certify every class protocol, an ordinarily well-typed source program accepted by the client checker has the guarantees of Theorem~\ref{thm:typestate}. | [`regular_family_certified`](#declaration-regular-family-certified), [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound) | PROVEN, scoped | The compiled regular-seed family is certified and composed with the source checker over a finite inhabited alphabet. regular_residual_program_correspondence connects baseline acceptance to the expression rules, including bulk exit. Nonemptiness remains a binding check; initialization progress and termination are not conclusions. |
+| [thm:copying-soundness](../paper/typestate.tex)<br>Assume every class protocol is regular and shuffle closed, and every opted-in class satisfies Equation~\eqref{eq:residual-shuffle}.<br>An ordinarily well-typed program satisfying the program judgment with the optional assignment rule has all guarantees of Theorem~\ref{thm:typestate}. | [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound), [`copying_runtime_no_error`](#declaration-copying-runtime-no-error), [`copying_runtime_equivalence`](#declaration-copying-runtime-equivalence) | PROVEN for the history-based source checker | The result uses copying_certified, including nested and mixed copying, with structural execution and automatic bulk exit. It transfers through the common raw ghost/surface correspondence. copying_residual_program_correspondence connects its acceptance to expression rules that inherit the source residual. Initialization and termination remain outside the result. |
+| [thm:accumulation-prefix](../paper/typestate.tex)<br>Let $K$ be a regular language and $P=\pref{K}$.<br>Equation~\eqref{eq:accumulation-error} holds if and only if every derivative $p^{-1}P$ is shuffle closed. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed) | PROVEN | The Rocq theorem permits any Prop-valued language K over any Type with an explicit decision procedure for prefix_language K. Regularity supplies that decision procedure for the paper's instance. No classical axiom supplies it. |
 | [thm:accumulation-bridge](../paper/typestate.tex)<br>If $K$ is an accumulation contract, every derivative $p^{-1}K$ is shuffle closed.<br>In particular, $K$ is shuffle closed. | [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`accumulation_contract_shuffle_closed`](#declaration-accumulation-contract-shuffle-closed) | PROVEN | The positive safe-extension law and completion stability form accumulation_contract. No regularity, finite alphabet, or decidability premise is needed for this implication. |
 
 The monitored conclusions also compose with the compiled and accumulation
@@ -140,10 +147,10 @@ choices. They are not substitutes for the whole-object soundness theorems.
 | Interface or claim | Declarations | What the proof establishes |
 | --- | --- | --- |
 | Exact coverage and the simulated frontier | [`covers_spec`](#declaration-covers-spec), [`covers_simulation_correct`](#declaration-covers-simulation-correct), [`simulation_state_bound`](#declaration-simulation-state-bound) | The direct predicate means singleton pumping reachability. The simulator returns the same result. Each frontier has at most length(seed)+1 states. No machine-time bound is proved. |
-| Finite enumeration and diagnostic completeness | [`shuffles_spec`](#declaration-shuffles-spec), [`counterexample_sound`](#declaration-counterexample-sound), [`counterexample_none`](#declaration-counterexample-none), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none) | Every interleaving is enumerated. Returned triples have accepted inputs and a rejected output. Witness absence agrees with successful certification. |
+| Finite enumeration and diagnostic completeness | [`shuffles_spec`](#declaration-shuffles-spec), [`shuffle_candidates_spec`](#declaration-shuffle-candidates-spec), [`counterexample` selection and `List.find_some`](#declaration-counterexample-selection), [`counterexample_sound`](#declaration-counterexample-sound), [`counterexample_none`](#declaration-counterexample-none), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none) | Every interleaving is enumerated. The selection definition and candidate-membership lemma establish that both returned input histories belong to the seed corpus; counterexample_sound exports their closure membership and the rejected interleaving. Witness absence agrees with successful certification. |
 | Compiled protocol queries | [`closure_regex_correct`](#declaration-closure-regex-correct), [`dfa_viable_spec`](#declaration-dfa-viable-spec), [`regular_family_language`](#declaration-regular-family-language), [`regular_family_certified`](#declaration-regular-family-certified) | Membership agrees with the compiled pumping closure. Viability means existence of a completing suffix. Successful certificates yield protocol-family shuffle closure. |
 | Exact baseline protocol condition | [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified) | For the existing baseline checker, all-object completion soundness is equivalent to certified P. This quantifies over all accepted core programs and their executions, rather than assuming the desired composition property as a premise. |
-| Exact executable/declarative core checking | [`check_step_sound`](#declaration-check-step-sound), [`check_step_complete`](#declaration-check-step-complete), [`check_trace_spec`](#declaration-check-trace-spec) | Both directions connect the executable baseline checker to the core declarative relation. This is not a formal translation theorem for Algorithm alg:client. |
+| Exact executable/declarative core checking | [`check_step_sound`](#declaration-check-step-sound), [`check_step_complete`](#declaration-check-step-complete), [`check_stmt_spec`](#declaration-check-stmt-spec) | Both directions connect the executable baseline checker to the core declarative relation. residual_program_correspondence additionally connects baseline source acceptance to the expression rules. |
 | Disabling inherited histories | [`fresh_program_unchanged`](#declaration-fresh-program-unchanged) | Setting every flag to false yields exactly the original checker, as equality of Boolean results for every statement. |
 | Inherited-history continuation invariant | [`future_safe_copy`](#declaration-future-safe-copy), [`copying_preservation`](#declaration-copying-preservation) | The proof retags hypothetical future events and uses the source residual once. It never shuffles two copies of the shared past. |
 | Exact residual certificate | [`certify_residuals_spec`](#declaration-certify-residuals-spec), [`certify_copying_regex_spec`](#declaration-certify-copying-regex-spec) | Reachable DFA states suffice to quantify over all left derivatives. The triple product encodes two accepted continuations and their potentially rejected interleaving. |
@@ -154,13 +161,13 @@ choices. They are not substitutes for the whole-object soundness theorems.
 | Unreachable-object completion and unguarded errors | [`abandoned_object_accepted`](#declaration-abandoned-object-accepted), [`abandoned_object_terminates`](#declaration-abandoned-object-terminates), [`abandoned_object_unreachable`](#declaration-abandoned-object-unreachable), [`abandoned_object_complete`](#declaration-abandoned-object-complete), [`raw_invalid_call_executes`](#declaration-raw-invalid-call-executes) | A completed object remains covered after its final reference is overwritten. A separate raw client executes an invalid event and reaches a nonviable history, ruling out a semantics that excludes errors by definition. |
 | An inhabited accumulation contract | [`two_calls_accumulation_contract`](#declaration-two-calls-accumulation-contract), [`inherited_progress_sound_via_accumulation`](#declaration-inherited-progress-sound-via-accumulation) | The protocol requires at least two occurrences of one event, forbids another event, and supports a client copying incomplete progress. Its soundness follows through the bridge. |
 | Completion implications are strict | [`odd_unary_not_shuffle_closed`](#declaration-odd-unary-not-shuffle-closed), [`gap_unary_residual_shuffle_closed`](#declaration-gap-unary-residual-shuffle-closed), [`gap_unary_not_completion_stable`](#declaration-gap-unary-not-completion-stable) | Universal viability alone does not give complete-history shuffle closure. Residual shuffle closure does not imply persistent completion. |
-| Residual certification is essential for the exhibited copying client | [`separating_copy_accepted_without_certificate`](#declaration-separating-copy-accepted-without-certificate), [`separating_copy_terminates`](#declaration-separating-copy-terminates), [`separating_copy_actual_history`](#declaration-separating-copy-actual-history), [`separating_copy_actual_history_not_viable`](#declaration-separating-copy-actual-history-not-viable), [`separating_copy_unsound_without_residual_certificate`](#declaration-separating-copy-unsound-without-residual-certificate) | The concrete client allocates x, calls x.a, copies y := x, calls x.c and y.b, and retires both. Bypassing the required residual certificate makes the local copying checker accept, but the raw object history acb is nonviable. The residual certificate rejects this protocol. This is not a counterexample to the soundness theorem. |
+| Residual certification is essential for the exhibited copying client | [`separating_copy_accepted_without_certificate`](#declaration-separating-copy-accepted-without-certificate), [`separating_copy_terminates`](#declaration-separating-copy-terminates), [`separating_copy_actual_history`](#declaration-separating-copy-actual-history), [`separating_copy_actual_history_not_viable`](#declaration-separating-copy-actual-history-not-viable), [`separating_copy_unsound_without_residual_certificate`](#declaration-separating-copy-unsound-without-residual-certificate) | The concrete client allocates x, calls x.a, copies y := x, calls x.c and y.b, then performs the single instrumented bulk exit. Bypassing the required residual certificate makes the local copying checker accept, but the raw object history acb is nonviable. The residual certificate rejects this protocol. This is not a counterexample to the soundness theorem. |
 | Baseline/copying and accumulation separation | [`separating_original_certificate`](#declaration-separating-original-certificate), [`separating_residual_not_closed`](#declaration-separating-residual-not-closed), [`separating_acb_not_viable`](#declaration-separating-acb-not-viable), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | For the stated six-seed protocol, baseline certification succeeds, the residual at a is not shuffle closed, and the extracted error law fails. This is a language-level separation, not a comparison of implementations. |
 | Strict hierarchy of regular protocol classes (end of §6) | [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`gap_unary_residual_shuffle_closed`](#declaration-gap-unary-residual-shuffle-closed), [`gap_unary_not_completion_stable`](#declaration-gap-unary-not-completion-stable), [`separating_original_certificate`](#declaration-separating-original-certificate), [`separating_residual_not_closed`](#declaration-separating-residual-not-closed) | The paper combines these proven implications and witnesses: accumulation contracts are a proper subclass of residual shuffle-closed protocols, which are a proper subclass of shuffle-closed protocols. Regularity of the unary gap language is immediate from its displayed definition, and regularity of the six-seed closure follows from construction. This hierarchy concerns languages, not inclusion of accepted client programs. |
 
 ## Definitions, rules, and representation correspondence
 
-The following comparison checks every primitive rule and the control-flow and
+The following comparison checks every primitive rule and the sequencing and
 program rules in `paper/typestate.tex`. A representation difference is not a
 false theorem. A missing correspondence proof matters when applying a core
 result to the paper's surface algorithm.
@@ -170,7 +177,7 @@ result to the paper's surface algorithm.
 | Pumping `w = pq`, `w′ = paq`, with `a` occurring in `p` | `pumping`, `pump_at`, `pumping_decompose`, `pumping_insert_char_after_prefix` in [pumping.v](pumping.v) | Indexed bounds ensure the copied event precedes the insertion. The default event is never read out of bounds by a successful step. The two decomposition/insertion lemmas connect the presentations. |
 | Pumping closure and originating seeds | `pumping_closure`, `seed_covers`, `covered_by`, `pumping_closure_seed_corpus` | Closure is an inductive proposition, separate from the generated regex. Factorization does not assume the desired language equality. |
 | Residual `u⁻¹K`, viability, nullability | `residual`, `prefix_language`, `qualifier_language`, `protocol_family.viable_spec` | A qualifier stores a class/history pair denoting an exact residual. Boolean acceptance is the definition of `protocol`. Viability is required to have a proof of its extension contract. |
-| Dynamic New | `run_new`, `allocate`, `install` in [semantics.v](semantics.v); `runtime_guard`, `monitored_step` | The raw step is unguarded; its monitored version checks empty-history viability and signals `ProtocolError` on failure. Fresh locations and epochs are successive naturals. The paper permits any fresh location; a renaming/ghost-erasure correspondence is not a separate theorem. |
+| Dynamic New | `run_new`, `allocate`, `install` in [semantics.v](semantics.v); `runtime_guard`, `monitored_step` | The raw step is unguarded; its monitored version checks empty-history viability and signals `ProtocolError` on failure. Ghost locations and epochs are successive naturals. surface_ghost_primitive equips any fresh surface location with a fresh ghost epoch and extends an injective location map; ghost_surface_primitive proves the converse. |
 | Static New | `type_new`, `check_bind` in [typestate.v](typestate.v) | Outgoing target is retirable. The new class's empty history is viable. The new history is empty. |
 | Dynamic Assign | `run_copy`, `bind` | Source is looked up in the pre-state. A new epoch refers to the same location, including self-assignment. No event is appended. |
 | Static Assign | `type_copy`, `check_step (Copy x y)` | Source lookup, target retirement, and initial viability match the fresh-history premises. Source and target can be equal. The old target must still be complete. |
@@ -181,11 +188,10 @@ result to the paper's surface algorithm.
 | Static Store | `type_store` | `field_type` equals the source class, and the qualifier environment is unchanged. Heap/class agreement is preserved in the invariant. |
 | Dynamic Call | `run_call`, `emit`, `runtime_guard`, `monitored_step`, `runtime_call_guard` | The raw rule requires only source lookup and can emit an invalid event. The monitored rule additionally checks viability of the updated aggregate receiver history and signals `ProtocolError` on failure. Error freedom for accepted programs follows from independent raw soundness. |
 | Static Call | `type_call`, `check_step (Call x a)` | Only the receiver history is extended. The extended history must be viable. The artifact uses a common event type `A`, with no separate `a ∈ Σ_C` judgment. Per-class event admissibility can be represented by protocol membership. Ordinary method typing is outside the formalization. |
-| Dynamic/static Finish | `run_finish`, `type_finish`, `check_step (Finish x)`, `runtime_exit_check` | Raw and monitored core `Finish x` retire one existing binding without a dynamic protocol guard; the static checker checks that binding's acceptance. The monitored program boundary separately checks all allocated object histories. Retirement preserves that check. Paper bulk `finish` retires all bindings at once; the complete source-to-core implementation correspondence is unmechanized. |
-| Skip | `Skip`, `paths Skip = [[]]` | The empty trace leaves the environment and machine unchanged. |
-| Seq | `paths`, `path_seq`, `typed_trace`, `execution` | Sequential paths are concatenated. Checking and execution compose along them. This represents finite branching syntax. |
-| If | `Branch`, `path_left`, `path_right`, `paths_spec`, `forallb` in `check_program` | Both branch paths are checked universally. Boolean conditions are abstracted as nondeterministic choices. No feasible-path precision claim is made. The paper instead propagates sets of residual environments. |
-| Program and exit insertion | `check_program`, `check_program_with_copy` | Every path starts with an empty environment and must end with no live binding. Explicit retirements are part of the supplied core syntax. Automatic exit insertion and equivalence to the paper's environment-set algorithm are not mechanized. A translation may need different retirements on different paths. |
+| Dynamic/static Finish | `run_finish`, `clear_refs`, `type_finish`, `all_complete_spec`, `runtime_exit_check` | One bulk step clears all bindings while preserving objects and histories. The raw rule is unguarded; the monitor checks every allocated object. The static rule checks each current qualifier and returns the empty environment. |
+| Skip | `Skip`, `type_skip`, `skip_terminal` | `Skip` preserves the static environment and has no runtime step. |
+| Seq | `Seq`, `type_seq`, `step_seq`, `step_skip`, `execution` | Checking composes through one intermediate environment. Only the left statement reduces; once it is `Skip`, the right statement becomes active. |
+| Program and exit insertion | `finish_free`, `instrument`, `check_program_spec`, `check_program_with_copy_spec`, `source_execution_iff` | Both checkers and execution helpers take source programs, reject source-level `Finish`, and insert `Seq s Finish`. Structural derivations start and end with the empty environment. The executable/source relationship includes `Skip`. |
 | Fresh-history local/object invariants | `invariant`, `project_partition`, `tagged_shuffle_closed` | Retired epochs retain their histories. Every allocated location has at least one epoch. Composition therefore uses a positive finite set and does not require that empty histories be complete. |
 | Inherited-view invariant | `copying_invariant`, `future_safe`, `future_safe_copy` | Hypothetical future tags must belong to the object's epochs (`supported`). Every epoch, including retired epochs, must have a completing view. Empty futures establish final object completion. |
 
@@ -222,9 +228,11 @@ semantic laws.
 The hypotheses are inhabited by kernel-checked positive clients in
 [examples.v](examples.v), [copying_examples.v](copying_examples.v), and
 [accumulation_examples.v](accumulation_examples.v), including allocation,
-branching, aliasing, fields, overwrites, and incomplete inherited progress.
+nested sequencing, aliasing, fields, overwrites, and incomplete inherited progress.
 `aliases_terminates` and `inherited_progress_terminates` give explicit full
-executions for accepted clients. Their history lemmas compute four and three
+executions for accepted clients. `noncanonical_surface_execution` chooses fresh
+locations 37 and 5, and `noncanonical_surface_equipped` constructs its matching
+ghost run; clearing references retains both allocated objects. Their history lemmas compute four and three
 actual events respectively. `abandoned_object_complete` applies the headline
 theorem to an object proved unreachable in the final machine.
 `raw_invalid_call_executes` proves that the raw semantics can execute an invalid
@@ -238,7 +246,7 @@ on an executable prefix/full execution. It is not an initialization-progress
 or termination theorem. An empty protocol may pass the shuffle certificate,
 but its failed initial-viability query prevents allocation by the checker.
 
-## Unresolved correspondence and scope issues
+## Remaining scope and release issues
 
 These are open proof extensions or submission tasks, **not discovered false
 Rocq theorems**. They should remain explicit in the artifact and manuscript.
@@ -249,8 +257,6 @@ closure alone cannot replace the residual certificate in general.
 
 | Issue | Present status | What would close it |
 | --- | --- | --- |
-| Bulk retirement and exit instrumentation | UNMECHANIZED. Disclosed in the paper and guide | Define a source-to-core translation and prove that inserted retirements empty each path's environment, preserve histories, and simulate bulk `finish`. Distinct exit environments can have different live variables, so a fixed retirement list is not sufficient in general. |
-| Representations of residuals and control-flow alternatives | UNMECHANIZED implementation correspondence | Relate regex denotations to `qualifier_language` and environment alternatives to enumerated paths. Prove that the source checker/translation preserves acceptance and executions. |
 | Optional converse for arbitrary copying modes | UNMECHANIZED optional strengthening. Not a missing claimed theorem | Prove or refute a general equivalence between copying_certified and completion soundness of all accepted mode-aware core programs. The paper claims sufficiency and an exact residual-language certificate. The concrete acb witness establishes the stronger condition's relevance for that example. |
 | Empty alphabet | Explicitly restricted mechanized representation, disclosed in the paper | Prove a separate empty-alphabet case or retain the stated inhabitance restriction. Arbitrary Prop-valued seeds are already covered by seed_shuffle_coveredP. The remaining issue concerns only the alphabet edge case. |
 | Ordinary initialization and method/field typing | Outside the core proof | Add an ordinary typing/initialization judgment and a progress or execution correspondence theorem. Current results intentionally quantify over executions that exist. |
@@ -384,7 +390,7 @@ Definition accumulation_contract {A} (K : language A) :=
 
 ### `typestate_prefix_sound`
 
-[soundness.v:67](soundness.v#L67)
+[soundness.v:74](soundness.v#L74)
 
 ```coq
 Theorem typestate_prefix_sound s m : certified P -> check_program P FT s = true ->
@@ -396,7 +402,7 @@ Theorem typestate_prefix_sound s m : certified P -> check_program P FT s = true 
 
 ### `typestate_completion_sound`
 
-[soundness.v:78](soundness.v#L78)
+[soundness.v:82](soundness.v#L82)
 
 ```coq
 Theorem typestate_completion_sound s m : certified P -> check_program P FT s = true ->
@@ -408,22 +414,21 @@ Theorem typestate_completion_sound s m : certified P -> check_program P FT s = t
 
 ### `completion_sound_requires_certified`
 
-[necessity.v:111](necessity.v#L111)
+[necessity.v:88](necessity.v#L88)
 
 ```coq
 Theorem completion_sound_requires_certified :
   (forall s m, check_program P FT s = true ->
     program_execution s initial_machine m ->
     forall l, l < next_loc m ->
-      protocol P (classes m l) (object_history m l)) ->
-  certified P.
+      protocol P (classes m l) (object_history m l)) -> certified P.
 ```
 
 <a id="declaration-completion-sound-iff-certified"></a>
 
 ### `completion_sound_iff_certified`
 
-[necessity.v:145](necessity.v#L145)
+[necessity.v:117](necessity.v#L117)
 
 ```coq
 Theorem completion_sound_iff_certified :
@@ -478,8 +483,8 @@ Lemma invariant_object_language m g l (K : language A) :
 [pumping.v:1324](pumping.v#L1324)
 
 ```coq
-Theorem pumping_normalize_correct r :
-  closure_equiv r (pumping_normalize r).
+  Theorem pumping_normalize_correct r :
+    closure_equiv r (pumping_normalize r).
 ```
 
 <a id="declaration-closure-regex-correct"></a>
@@ -631,7 +636,7 @@ Theorem copying_regular_program_completion_sound s m : check_regular_program_wit
 
 ### `check_step_sound`
 
-[typestate.v:59](typestate.v#L59)
+[typestate.v:69](typestate.v#L69)
 
 ```coq
 Lemma check_step_sound i g g' : check_step i g = Some g' -> type_step g i g'.
@@ -641,20 +646,20 @@ Lemma check_step_sound i g g' : check_step i g = Some g' -> type_step g i g'.
 
 ### `check_step_complete`
 
-[typestate.v:78](typestate.v#L78)
+[typestate.v:87](typestate.v#L87)
 
 ```coq
 Lemma check_step_complete g i g' : type_step g i g' -> check_step i g = Some g'.
 ```
 
-<a id="declaration-check-trace-spec"></a>
+<a id="declaration-check-stmt-spec"></a>
 
-### `check_trace_spec`
+### `check_stmt_spec`
 
-[typestate.v:100](typestate.v#L100)
+[typestate.v:111](typestate.v#L111)
 
 ```coq
-Lemma check_trace_spec is g g' : check_trace is g = Some g' <-> typed_trace g is g'.
+Theorem check_stmt_spec s g g' : check_stmt s g = Some g' <-> typed_stmt g s g'.
 ```
 
 <a id="declaration-pumping-closure-regular-regex"></a>
@@ -664,17 +669,17 @@ Lemma check_trace_spec is g g' : check_trace is g = Some g' <-> typed_trace g is
 [pumping.v:1393](pumping.v#L1393)
 
 ```coq
-Theorem pumping_closure_regular_regex r :
-  RegLang.dfa.regular
-    (fun out : word =>
-      @pumping_closure char d0 (regex_lang r) out).
+  Theorem pumping_closure_regular_regex r :
+    RegLang.dfa.regular
+      (fun out : word =>
+        @pumping_closure char d0 (regex_lang r) out).
 ```
 
 <a id="declaration-copy-step-spec"></a>
 
 ### `copy_step_spec`
 
-[copying_typestate.v:39](copying_typestate.v#L39)
+[copying_typestate.v:44](copying_typestate.v#L44)
 
 ```coq
 Lemma copy_step_spec g x y g' :
@@ -688,7 +693,7 @@ Lemma copy_step_spec g x y g' :
 
 ### `copying_program_prefix_sound`
 
-[copying_soundness.v:345](copying_soundness.v#L345)
+[copying_soundness.v:390](copying_soundness.v#L390)
 
 ```coq
 Theorem copying_program_prefix_sound s m :
@@ -700,7 +705,7 @@ Theorem copying_program_prefix_sound s m :
 
 ### `copying_program_completion_sound`
 
-[copying_soundness.v:356](copying_soundness.v#L356)
+[copying_soundness.v:399](copying_soundness.v#L399)
 
 ```coq
 Theorem copying_program_completion_sound s m :
@@ -754,8 +759,8 @@ Theorem kellogg_protocol_copying_certified {A}
 [pumping.v:1763](pumping.v#L1763)
 
 ```coq
-Theorem seed_shuffle_coveredP (S : lang) :
-  seed_shuffle_covered S <-> shuffle_closed (covered_by S).
+  Theorem seed_shuffle_coveredP (S : lang) :
+    seed_shuffle_covered S <-> shuffle_closed (covered_by S).
 ```
 
 <a id="declaration-base-shuffle-coveredP"></a>
@@ -765,9 +770,9 @@ Theorem seed_shuffle_coveredP (S : lang) :
 [pumping.v:1736](pumping.v#L1736)
 
 ```coq
-Theorem base_shuffle_coveredP (L : dlang) :
-  base_shuffle_covered L <->
-  shuffle_closed (pumping_closure_lang L).
+  Theorem base_shuffle_coveredP (L : dlang) :
+    base_shuffle_covered L <->
+    shuffle_closed (pumping_closure_lang L).
 ```
 
 <a id="declaration-kellogg-program-prefix-sound"></a>
@@ -816,11 +821,11 @@ Theorem certify_residuals_spec : certify_residuals = true <->
 [pumping.v:636](pumping.v#L636)
 
 ```coq
-Lemma pumping_closure_cat
-    (L1 L2 : dlang) (u v : word) :
-  @pumping_closure char d0 L1 u ->
-  @pumping_closure char d0 L2 v ->
-  @pumping_closure char d0 (RegLang.languages.conc L1 L2) (u ++ v).
+  Lemma pumping_closure_cat
+      (L1 L2 : dlang) (u v : word) :
+    @pumping_closure char d0 L1 u ->
+    @pumping_closure char d0 L2 v ->
+    @pumping_closure char d0 (RegLang.languages.conc L1 L2) (u ++ v).
 ```
 
 <a id="declaration-pumping-closure-singleton-correct"></a>
@@ -830,9 +835,9 @@ Lemma pumping_closure_cat
 [pumping.v:1331](pumping.v#L1331)
 
 ```coq
-Lemma pumping_closure_singleton_correct w out :
-  @pumping_closure char d0 (pred1 w) out <->
-  out \in pumping_singleton_re w.
+  Lemma pumping_closure_singleton_correct w out :
+    @pumping_closure char d0 (pred1 w) out <->
+    out \in pumping_singleton_re w.
 ```
 
 <a id="declaration-pumping-closure-star-finite-basis"></a>
@@ -842,8 +847,8 @@ Lemma pumping_closure_singleton_correct w out :
 [pumping.v:1227](pumping.v#L1227)
 
 ```coq
-Theorem pumping_closure_star_finite_basis (r : regexp) :
-  closure_equiv (Star r) (bounded_star_basis r).
+  Theorem pumping_closure_star_finite_basis (r : regexp) :
+    closure_equiv (Star r) (bounded_star_basis r).
 ```
 
 <a id="declaration-eliminate-star-correct"></a>
@@ -853,8 +858,8 @@ Theorem pumping_closure_star_finite_basis (r : regexp) :
 [pumping.v:1311](pumping.v#L1311)
 
 ```coq
-Theorem eliminate_star_correct r :
-  closure_equiv r (eliminate_star r).
+  Theorem eliminate_star_correct r :
+    closure_equiv r (eliminate_star r).
 ```
 
 <a id="declaration-eliminate-star-star-free"></a>
@@ -864,8 +869,8 @@ Theorem eliminate_star_correct r :
 [pumping.v:443](pumping.v#L443)
 
 ```coq
-Lemma eliminate_star_star_free r :
-  star_free (eliminate_star r).
+  Lemma eliminate_star_star_free r :
+    star_free (eliminate_star r).
 ```
 
 <a id="declaration-star-free-finite"></a>
@@ -875,8 +880,8 @@ Lemma eliminate_star_star_free r :
 [pumping.v:408](pumping.v#L408)
 
 ```coq
-Lemma star_free_finite (r : regexp) :
-  star_free r -> finite_lang (regex_lang r).
+  Lemma star_free_finite (r : regexp) :
+    star_free r -> finite_lang (regex_lang r).
 ```
 
 <a id="declaration-words-of-star-free-correct"></a>
@@ -886,9 +891,9 @@ Lemma star_free_finite (r : regexp) :
 [pumping.v:366](pumping.v#L366)
 
 ```coq
-Lemma words_of_star_free_correct r :
-  star_free r ->
-  forall w, (w \in r) = (w \in words_of_star_free r).
+  Lemma words_of_star_free_correct r :
+    star_free r ->
+    forall w, (w \in r) = (w \in words_of_star_free r).
 ```
 
 <a id="declaration-pumping-interleaving-left"></a>
@@ -898,11 +903,11 @@ Lemma words_of_star_free_correct r :
 [pumping.v:1563](pumping.v#L1563)
 
 ```coq
-Lemma pumping_interleaving_left u u' v w' :
-  @pumping char d0 u u' ->
-  interleaving u' v w' ->
-  exists w,
-    interleaving u v w /\ @pumping char d0 w w'.
+  Lemma pumping_interleaving_left u u' v w' :
+    @pumping char d0 u u' ->
+    interleaving u' v w' ->
+    exists w,
+      interleaving u v w /\ @pumping char d0 w w'.
 ```
 
 <a id="declaration-pumping-interleaving-right"></a>
@@ -912,11 +917,11 @@ Lemma pumping_interleaving_left u u' v w' :
 [pumping.v:1598](pumping.v#L1598)
 
 ```coq
-Lemma pumping_interleaving_right u v v' w' :
-  @pumping char d0 v v' ->
-  interleaving u v' w' ->
-  exists w,
-    interleaving u v w /\ @pumping char d0 w w'.
+  Lemma pumping_interleaving_right u v v' w' :
+    @pumping char d0 v v' ->
+    interleaving u v' w' ->
+    exists w,
+      interleaving u v w /\ @pumping char d0 w w'.
 ```
 
 <a id="declaration-seed-cover-interleaving-factor"></a>
@@ -926,12 +931,12 @@ Lemma pumping_interleaving_right u v v' w' :
 [pumping.v:1703](pumping.v#L1703)
 
 ```coq
-Lemma seed_cover_interleaving_factor su sv u v w :
-  seed_covers su u ->
-  seed_covers sv v ->
-  interleaving u v w ->
-  exists z,
-    interleaving su sv z /\ seed_covers z w.
+  Lemma seed_cover_interleaving_factor su sv u v w :
+    seed_covers su u ->
+    seed_covers sv v ->
+    interleaving u v w ->
+    exists z,
+      interleaving su sv z /\ seed_covers z w.
 ```
 
 <a id="declaration-certify-seeds-spec"></a>
@@ -960,22 +965,23 @@ Lemma prefix_shuffle_closed {A} (K : language A) :
 
 ### `preservation`
 
-[invariants.v:190](invariants.v#L190)
+[invariants.v:180](invariants.v#L180)
 
 ```coq
 Lemma preservation m g i m' g' : invariant m g ->
-  raw_step i m m' -> type_step P FT g i g' -> invariant m' g'.
+  primitive_step i m m' -> type_step P FT g i g' -> invariant m' g'.
 ```
 
-<a id="declaration-trace-preservation"></a>
+<a id="declaration-execution-preservation"></a>
 
-### `trace_preservation`
+### `execution_preservation`
 
-[invariants.v:215](invariants.v#L215)
+[invariants.v:219](invariants.v#L219)
 
 ```coq
-Lemma trace_preservation m g is m' g' : invariant m g ->
-  execution is m m' -> typed_trace P FT g is g' -> invariant m' g'.
+Theorem execution_preservation c d : execution c d ->
+  forall g gf, invariant (fst c) g -> typed_stmt P FT g (snd c) gf ->
+  exists g', invariant (fst d) g' /\ typed_stmt P FT g' (snd d) gf.
 ```
 
 <a id="declaration-residual-snoc"></a>
@@ -1053,6 +1059,44 @@ Theorem simulation_state_bound seed out :
 Theorem shuffles_spec {A} (u v w : list A) : In w (shuffles u v) <-> shuffle u v w.
 ```
 
+<a id="declaration-counterexample-selection"></a>
+
+### Definitions `shuffle_candidates`, `counterexample`, and `regex_counterexample`
+
+[certification.v:100](certification.v#L100), [certification.v:155](certification.v#L155)
+
+```coq
+Definition shuffle_candidates (seeds : seq (seq A)) :=
+  List.flat_map (fun u => List.flat_map (fun v =>
+    List.map (fun w => (u,v,w)) (shuffles u v)) seeds) seeds.
+Definition counterexample seeds :=
+  List.find (fun t => negb (coveredb seeds (snd t))) (shuffle_candidates seeds).
+
+Definition regex_counterexample (r : regexp A) := counterexample (normalized_seeds r).
+```
+
+For a returned triple, the standard-library lemma `List.find_some` gives
+membership in `shuffle_candidates seeds`. The following proved lemma then
+gives membership of both input histories in `seeds`, as well as their
+interleaving. The proof of `counterexample_sound` performs precisely these
+steps at [certification.v:127](certification.v#L127), but its exported signature
+weakens input seed membership to pumping-closure membership. Applying the same
+steps after unfolding `regex_counterexample` gives membership in
+`normalized_seeds r`, the paper's $F(r)$; this consequence is not a separately
+exported theorem.
+
+<a id="declaration-shuffle-candidates-spec"></a>
+
+### `shuffle_candidates_spec`
+
+[certification.v:106](certification.v#L106)
+
+```coq
+Lemma shuffle_candidates_spec seeds u v w :
+  List.In (u,v,w) (shuffle_candidates seeds) <->
+  List.In u seeds /\ List.In v seeds /\ @interleaving A u v w.
+```
+
 <a id="declaration-counterexample-sound"></a>
 
 ### `counterexample_sound`
@@ -1115,7 +1159,7 @@ Theorem regular_family_certified spec :
 
 ### `fresh_program_unchanged`
 
-[copying_typestate.v:87](copying_typestate.v#L87)
+[copying_typestate.v:175](copying_typestate.v#L175)
 
 ```coq
 Theorem fresh_program_unchanged {A} (P : protocol_family A) FT s :
@@ -1138,11 +1182,11 @@ Lemma future_safe_copy K I V w n s : ~ I n -> I s ->
 
 ### `copying_preservation`
 
-[copying_soundness.v:274](copying_soundness.v#L274)
+[copying_soundness.v:275](copying_soundness.v#L275)
 
 ```coq
 Theorem copying_preservation m g V i m' g' : copying_invariant m g V ->
-  raw_step i m m' -> check_step_with_copy P FT copy_history i g = Some g' ->
+  primitive_step i m m' -> check_step_with_copy P FT copy_history i g = Some g' ->
   exists V', copying_invariant m' g' V'.
 ```
 
@@ -1197,7 +1241,7 @@ Theorem observations_accumulate_iff_contract {A} (K : language A) :
 
 ### `aliases_accepted`
 
-[examples.v:54](examples.v#L54)
+[examples.v:44](examples.v#L44)
 
 ```coq
 Example aliases_accepted : check_program two_calls fields aliases = true.
@@ -1207,7 +1251,7 @@ Example aliases_accepted : check_program two_calls fields aliases = true.
 
 ### `aliases_terminates`
 
-[examples.v:108](examples.v#L108)
+[examples.v:86](examples.v#L86)
 
 ```coq
 Example aliases_terminates : program_execution aliases initial_machine aliases_final.
@@ -1217,7 +1261,7 @@ Example aliases_terminates : program_execution aliases initial_machine aliases_f
 
 ### `aliases_object_history`
 
-[examples.v:113](examples.v#L113)
+[examples.v:92](examples.v#L92)
 
 ```coq
 Example aliases_object_history : next_loc aliases_final = 1 /\
@@ -1239,7 +1283,7 @@ Example inherited_progress_accepted :
 
 ### `inherited_progress_terminates`
 
-[copying_examples.v:50](copying_examples.v#L50)
+[copying_examples.v:49](copying_examples.v#L49)
 
 ```coq
 Example inherited_progress_terminates :
@@ -1250,7 +1294,7 @@ Example inherited_progress_terminates :
 
 ### `inherited_progress_object_history`
 
-[copying_examples.v:56](copying_examples.v#L56)
+[copying_examples.v:57](copying_examples.v#L57)
 
 ```coq
 Example inherited_progress_object_history :
@@ -1262,7 +1306,7 @@ Example inherited_progress_object_history :
 
 ### `abandoned_object_accepted`
 
-[examples.v:130](examples.v#L130)
+[examples.v:109](examples.v#L109)
 
 ```coq
 Example abandoned_object_accepted :
@@ -1273,7 +1317,7 @@ Example abandoned_object_accepted :
 
 ### `abandoned_object_terminates`
 
-[examples.v:133](examples.v#L133)
+[examples.v:112](examples.v#L112)
 
 ```coq
 Example abandoned_object_terminates :
@@ -1284,7 +1328,7 @@ Example abandoned_object_terminates :
 
 ### `abandoned_object_unreachable`
 
-[examples.v:139](examples.v#L139)
+[examples.v:119](examples.v#L119)
 
 ```coq
 Example abandoned_object_unreachable :
@@ -1298,7 +1342,7 @@ Example abandoned_object_unreachable :
 
 ### `abandoned_object_complete`
 
-[examples.v:149](examples.v#L149)
+[examples.v:129](examples.v#L129)
 
 ```coq
 Example abandoned_object_complete :
@@ -1310,7 +1354,7 @@ Example abandoned_object_complete :
 
 ### `raw_invalid_call_executes`
 
-[examples.v:162](examples.v#L162)
+[examples.v:142](examples.v#L142)
 
 ```coq
 Example raw_invalid_call_executes :
@@ -1378,7 +1422,7 @@ Example gap_unary_not_completion_stable : ~ completion_stable gap_unary_completi
 
 ### `separating_copy_accepted_without_certificate`
 
-[kellogg_separation.v:129](kellogg_separation.v#L129)
+[kellogg_separation.v:119](kellogg_separation.v#L119)
 
 ```coq
 Example separating_copy_accepted_without_certificate :
@@ -1390,7 +1434,7 @@ Example separating_copy_accepted_without_certificate :
 
 ### `separating_copy_terminates`
 
-[kellogg_separation.v:166](kellogg_separation.v#L166)
+[kellogg_separation.v:151](kellogg_separation.v#L151)
 
 ```coq
 Example separating_copy_terminates :
@@ -1401,7 +1445,7 @@ Example separating_copy_terminates :
 
 ### `separating_copy_actual_history`
 
-[kellogg_separation.v:175](kellogg_separation.v#L175)
+[kellogg_separation.v:160](kellogg_separation.v#L160)
 
 ```coq
 Example separating_copy_actual_history :
@@ -1413,7 +1457,7 @@ Example separating_copy_actual_history :
 
 ### `separating_copy_actual_history_not_viable`
 
-[kellogg_separation.v:180](kellogg_separation.v#L180)
+[kellogg_separation.v:165](kellogg_separation.v#L165)
 
 ```coq
 Example separating_copy_actual_history_not_viable :
@@ -1425,7 +1469,7 @@ Example separating_copy_actual_history_not_viable :
 
 ### `separating_copy_unsound_without_residual_certificate`
 
-[kellogg_separation.v:188](kellogg_separation.v#L188)
+[kellogg_separation.v:173](kellogg_separation.v#L173)
 
 ```coq
 Theorem separating_copy_unsound_without_residual_certificate :
@@ -1477,11 +1521,11 @@ and viability queries; no new global assumptions are introduced.
 
 ### `runtime_call_guard`
 
-[runtime_monitor.v:35](runtime_monitor.v#L35)
+[runtime_monitor.v:33](runtime_monitor.v#L33)
 
 ```coq
 Lemma runtime_call_guard x a m m' l :
-  raw_step (Call x a) m m' -> reference m x = Some l ->
+  primitive_step (Call x a) m m' -> reference m x = Some l ->
   runtime_guard (Call x a) m m' =
     viable P (classes m l) (object_history m l ++ [a]).
 ```
@@ -1490,28 +1534,28 @@ Lemma runtime_call_guard x a m m' l :
 
 ### `runtime_exit_check_spec`
 
-[runtime_monitor.v:55](runtime_monitor.v#L55)
+[runtime_monitor.v:49](runtime_monitor.v#L49)
 
 ```coq
 Lemma runtime_exit_check_spec m : runtime_exit_check m = true <->
   forall l, l < next_loc m -> protocol P (classes m l) (object_history m l).
 ```
 
-<a id="declaration-runtime-exit-check-retire"></a>
+<a id="declaration-runtime-exit-check-clear"></a>
 
-### `runtime_exit_check_retire`
+### `runtime_exit_check_clear`
 
-[runtime_monitor.v:52](runtime_monitor.v#L52)
+[runtime_monitor.v:47](runtime_monitor.v#L47)
 
 ```coq
-Lemma runtime_exit_check_retire m x : runtime_exit_check (retire m x) = runtime_exit_check m.
+Lemma runtime_exit_check_clear m : runtime_exit_check (clear_refs m) = runtime_exit_check m.
 ```
 
 <a id="declaration-raw-contract-monitor-no-error"></a>
 
 ### `raw_contract_monitor_no_error`
 
-[runtime_monitor.v:169](runtime_monitor.v#L169)
+[runtime_monitor.v:262](runtime_monitor.v#L262)
 
 ```coq
 Theorem raw_contract_monitor_no_error s : raw_protocol_contract s ->
@@ -1522,11 +1566,11 @@ Theorem raw_contract_monitor_no_error s : raw_protocol_contract s ->
 
 ### `raw_contract_monitor_equivalence`
 
-[runtime_monitor.v:185](runtime_monitor.v#L185)
+[runtime_monitor.v:277](runtime_monitor.v#L277)
 
 ```coq
 Theorem raw_contract_monitor_equivalence s : raw_protocol_contract s -> forall m,
-  monitored_program s initial_machine (RuntimeState m) <->
+  monitored_program s initial_machine (RuntimeState (m,Skip)) <->
   program_execution s initial_machine m.
 ```
 
@@ -1534,7 +1578,7 @@ Theorem raw_contract_monitor_equivalence s : raw_protocol_contract s -> forall m
 
 ### `baseline_runtime_no_error`
 
-[runtime_monitor.v:205](runtime_monitor.v#L205)
+[runtime_monitor.v:293](runtime_monitor.v#L293)
 
 ```coq
 Theorem baseline_runtime_no_error FT s : certified P ->
@@ -1545,11 +1589,11 @@ Theorem baseline_runtime_no_error FT s : certified P ->
 
 ### `baseline_runtime_equivalence`
 
-[runtime_monitor.v:209](runtime_monitor.v#L209)
+[runtime_monitor.v:300](runtime_monitor.v#L300)
 
 ```coq
 Theorem baseline_runtime_equivalence FT s : certified P -> check_program P FT s = true ->
-  forall m, monitored_program s initial_machine (RuntimeState m) <->
+  forall m, monitored_program s initial_machine (RuntimeState (m,Skip)) <->
     program_execution s initial_machine m.
 ```
 
@@ -1557,7 +1601,7 @@ Theorem baseline_runtime_equivalence FT s : certified P -> check_program P FT s 
 
 ### `copying_runtime_no_error`
 
-[runtime_monitor.v:222](runtime_monitor.v#L222)
+[runtime_monitor.v:311](runtime_monitor.v#L311)
 
 ```coq
 Theorem copying_runtime_no_error FT mode s : copying_certified P mode ->
@@ -1569,11 +1613,855 @@ Theorem copying_runtime_no_error FT mode s : copying_certified P mode ->
 
 ### `copying_runtime_equivalence`
 
-[runtime_monitor.v:227](runtime_monitor.v#L227)
+[runtime_monitor.v:320](runtime_monitor.v#L320)
 
 ```coq
 Theorem copying_runtime_equivalence FT mode s : copying_certified P mode ->
   check_program_with_copy P FT mode s = true -> forall m,
-  monitored_program s initial_machine (RuntimeState m) <->
+  monitored_program s initial_machine (RuntimeState (m,Skip)) <->
     program_execution s initial_machine m.
+```
+
+
+## Structural and representation declaration index
+
+Both regex correspondences use `A : finType`, a protocol family `P`,
+field types, and an initial expression for each class whose denotation equals
+that class protocol. Each regular-seed instance proves that representation
+premise. The optional relation takes a per-class `mode`; an enabled assignment
+copies the source expression, while ordinary transfers reuse the baseline rules. Surface simulations use an injective location map on the allocated
+domain and a well-formed ghost machine. Their results may extend this map
+when allocating. Prefix/final property transfers start from the empty machines.
+
+<a id="declaration-instrument-single-exit"></a>
+
+### `instrument_single_exit`
+
+[syntax.v:95](syntax.v#L95)
+
+```coq
+Theorem instrument_single_exit {A} (s : statement A) :
+  finish_free s -> finish_count (instrument s) = 1.
+```
+
+<a id="declaration-instrument-not-source"></a>
+
+### `instrument_not_source`
+
+[syntax.v:98](syntax.v#L98)
+
+```coq
+Theorem instrument_not_source {A} (s : statement A) : ~ finish_free (instrument s).
+```
+
+<a id="declaration-source-execution-iff"></a>
+
+### `source_execution_iff`
+
+[semantics.v:165](semantics.v#L165)
+
+```coq
+Theorem source_execution_iff {A} (s : statement A) m m' :
+  program_execution s m m' <-> finish_free s /\
+    exists k, execution (m,s) (k,Skip) /\ m'=clear_refs k.
+```
+
+<a id="declaration-source-execution-no-early-exit"></a>
+
+### `source_execution_no_early_exit`
+
+[semantics.v:184](semantics.v#L184)
+
+```coq
+Theorem source_execution_no_early_exit {A} (c d : configuration A) :
+  execution c d -> finish_free (snd c) -> finish_free (snd d).
+```
+
+<a id="declaration-raw-step-decompose"></a>
+
+### `raw_step_decompose`
+
+[semantics.v:132](semantics.v#L132)
+
+```coq
+Lemma raw_step_decompose {A} (m m' : machine A) s s' : raw_step (m,s) (m',s') ->
+  (exists E i, s=plug E i /\ s'=plug E Skip /\ primitive_step i m m') \/
+  (exists E t, s=plug E (Seq Skip t) /\ s'=plug E t /\ m'=m).
+```
+
+<a id="declaration-raw-step-context"></a>
+
+### `raw_step_context`
+
+[semantics.v:91](semantics.v#L91)
+
+```coq
+Lemma raw_step_context {A} (E : context A) m s m' s' :
+  raw_step (m,s) (m',s') -> raw_step (m,plug E s) (m',plug E s').
+```
+
+<a id="declaration-execution-context"></a>
+
+### `execution_context`
+
+[semantics.v:94](semantics.v#L94)
+
+```coq
+Lemma execution_context {A} (E : context A) c d :
+  execution c d -> execution (fst c,plug E (snd c)) (fst d,plug E (snd d)).
+```
+
+<a id="declaration-check-program-spec"></a>
+
+### `check_program_spec`
+
+[typestate.v:138](typestate.v#L138)
+
+```coq
+Theorem check_program_spec s : check_program s = true <->
+  finish_free s /\ typed_stmt [] (instrument s) [].
+```
+
+<a id="declaration-all-complete-spec"></a>
+
+### `all_complete_spec`
+
+[typestate.v:21](typestate.v#L21)
+
+```coq
+Lemma all_complete_spec g : all_complete g = true <->
+  forall x c w, get g x = Some (c,w) -> accepts P c w = true.
+```
+
+<a id="declaration-source-checker-instrument"></a>
+
+### `source_checker_instrument`
+
+[typestate.v:152](typestate.v#L152)
+
+```coq
+Theorem source_checker_instrument s : check_program s = true <->
+  finish_free s /\ exists g, check_stmt s []=Some g /\ all_complete g=true.
+```
+
+<a id="declaration-invariant-clear-refs"></a>
+
+### `invariant_clear_refs`
+
+[invariants.v:161](invariants.v#L161)
+
+```coq
+Lemma invariant_clear_refs m g : invariant m g -> all_complete P g=true ->
+  invariant (clear_refs m) [].
+```
+
+<a id="declaration-step-preservation"></a>
+
+### `step_preservation`
+
+[invariants.v:203](invariants.v#L203)
+
+```coq
+Theorem step_preservation m s m' s' : raw_step (m,s) (m',s') ->
+  forall g gf, invariant m g -> typed_stmt P FT g s gf ->
+  exists g', invariant m' g' /\ typed_stmt P FT g' s' gf.
+```
+
+<a id="declaration-context-preservation"></a>
+
+### `context_preservation`
+
+[invariants.v:227](invariants.v#L227)
+
+```coq
+Lemma context_preservation E m s m' s' g gf :
+  invariant m g -> typed_stmt P FT g (plug E s) gf -> raw_step (m,s) (m',s') ->
+  exists g', invariant m' g' /\ typed_stmt P FT g' (plug E s') gf.
+```
+
+<a id="declaration-check-stmt-with-copy-spec"></a>
+
+### `check_stmt_with_copy_spec`
+
+[copying_typestate.v:120](copying_typestate.v#L120)
+
+```coq
+Lemma check_stmt_with_copy_spec s g g' :
+  check_stmt_with_copy s g = Some g' <-> typed_stmt_with_copy g s g'.
+```
+
+<a id="declaration-check-program-with-copy-spec"></a>
+
+### `check_program_with_copy_spec`
+
+[copying_typestate.v:152](copying_typestate.v#L152)
+
+```coq
+Lemma check_program_with_copy_spec s :
+  check_program_with_copy s = true <->
+  finish_free s /\ typed_stmt_with_copy [] (instrument s) [].
+```
+
+<a id="declaration-ci-clear-refs"></a>
+
+### `ci_clear_refs`
+
+[copying_soundness.v:245](copying_soundness.v#L245)
+
+```coq
+Lemma ci_clear_refs m g V : copying_invariant m g V ->
+  all_complete P g = true -> copying_invariant (clear_refs m) [] V.
+```
+
+<a id="declaration-copying-step-preservation"></a>
+
+### `copying_step_preservation`
+
+[copying_soundness.v:314](copying_soundness.v#L314)
+
+```coq
+Theorem copying_step_preservation m s m' s' g V gf :
+  raw_step (m,s) (m',s') -> copying_invariant m g V ->
+  typed_stmt_with_copy P FT copy_history g s gf ->
+  exists g' V', copying_invariant m' g' V' /\
+    typed_stmt_with_copy P FT copy_history g' s' gf.
+```
+
+<a id="declaration-copying-context-preservation"></a>
+
+### `copying_context_preservation`
+
+[copying_soundness.v:339](copying_soundness.v#L339)
+
+```coq
+Corollary copying_context_preservation E m s m' s' g V gf :
+  raw_step (m,s) (m',s') -> copying_invariant m g V ->
+  typed_stmt_with_copy P FT copy_history g (plug E s) gf ->
+  exists g' V', copying_invariant m' g' V' /\
+    typed_stmt_with_copy P FT copy_history g' (plug E s') gf.
+```
+
+<a id="declaration-copying-execution-preservation"></a>
+
+### `copying_execution_preservation`
+
+[copying_soundness.v:351](copying_soundness.v#L351)
+
+```coq
+Theorem copying_execution_preservation c d g V gf :
+  execution c d -> copying_invariant (fst c) g V ->
+  typed_stmt_with_copy P FT copy_history g (snd c) gf ->
+  exists g' V', copying_invariant (fst d) g' V' /\
+    typed_stmt_with_copy P FT copy_history g' (snd d) gf.
+```
+
+<a id="declaration-residual-checker-correspondence"></a>
+
+### `residual_checker_correspondence`
+
+[residual_typestate.v:248](residual_typestate.v#L248)
+
+```coq
+Theorem residual_checker_correspondence g G s : environments_related g G ->
+  ((exists g', check_stmt P field_type s g = Some g') <->
+   exists G', regex_typed_stmt G s G').
+```
+
+<a id="declaration-residual-program-correspondence"></a>
+
+### `residual_program_correspondence`
+
+[residual_typestate.v:271](residual_typestate.v#L271)
+
+```coq
+Theorem residual_program_correspondence s :
+  check_program P field_type s = true <->
+  finish_free s /\ regex_typed_stmt [] (instrument s) [].
+```
+
+<a id="declaration-regular-residual-program-correspondence"></a>
+
+### `regular_residual_program_correspondence`
+
+[residual_typestate.v:300](residual_typestate.v#L300)
+
+```coq
+Theorem regular_residual_program_correspondence s :
+  check_program (regular_family spec) field_type s = true <->
+  finish_free s /\ regex_typed_stmt field_type (fun c => closure_regex (spec c))
+    [] (instrument s) [].
+```
+
+<a id="declaration-ghost-surface-primitive"></a>
+
+### `ghost_surface_primitive`
+
+[surface_semantics.v:415](surface_semantics.v#L415)
+
+```coq
+Theorem ghost_surface_primitive {A} r i (m m' : machine A) M :
+  ghost_well_formed m -> represents r m M -> primitive_step i m m' ->
+  exists r' M', extends_on (next_loc m) r r' /\
+    surface_primitive i M M' /\ represents r' m' M'.
+```
+
+<a id="declaration-surface-ghost-primitive"></a>
+
+### `surface_ghost_primitive`
+
+[surface_semantics.v:450](surface_semantics.v#L450)
+
+```coq
+Theorem surface_ghost_primitive {A} r i (m : machine A) M M' :
+  ghost_well_formed m -> represents r m M -> surface_primitive i M M' ->
+  exists r' m', extends_on (next_loc m) r r' /\
+    primitive_step i m m' /\ represents r' m' M'.
+```
+
+<a id="declaration-ghost-surface-step"></a>
+
+### `ghost_surface_step`
+
+[surface_semantics.v:536](surface_semantics.v#L536)
+
+```coq
+Theorem ghost_surface_step {A} r (m m' : machine A) M s s' :
+  ghost_well_formed m -> represents r m M -> raw_step (m,s) (m',s') ->
+  exists r' M', extends_on (next_loc m) r r' /\
+    surface_step (M,s) (M',s') /\ represents r' m' M'.
+```
+
+<a id="declaration-surface-ghost-step"></a>
+
+### `surface_ghost_step`
+
+[surface_semantics.v:550](surface_semantics.v#L550)
+
+```coq
+Theorem surface_ghost_step {A} r (m : machine A) M M' s s' :
+  ghost_well_formed m -> represents r m M -> surface_step (M,s) (M',s') ->
+  exists r' m', extends_on (next_loc m) r r' /\
+    raw_step (m,s) (m',s') /\ represents r' m' M'.
+```
+
+<a id="declaration-ghost-surface-execution"></a>
+
+### `ghost_surface_execution`
+
+[surface_semantics.v:564](surface_semantics.v#L564)
+
+```coq
+Theorem ghost_surface_execution {A} (c d : configuration A) r M :
+  ghost_well_formed (fst c) -> represents r (fst c) M -> execution c d ->
+  exists r' M', extends_on (next_loc (fst c)) r r' /\
+    surface_execution (M,snd c) (M',snd d) /\ represents r' (fst d) M'.
+```
+
+<a id="declaration-surface-ghost-execution"></a>
+
+### `surface_ghost_execution`
+
+[surface_semantics.v:581](surface_semantics.v#L581)
+
+```coq
+Theorem surface_ghost_execution {A} (c d : surface_configuration A) r m :
+  ghost_well_formed m -> represents r m (fst c) -> surface_execution c d ->
+  exists r' m', extends_on (next_loc m) r r' /\
+    execution (m,snd c) (m',snd d) /\ represents r' m' (fst d).
+```
+
+<a id="declaration-represents-extensional"></a>
+
+### `represents_extensional`
+
+[surface_semantics.v:650](surface_semantics.v#L650)
+
+```coq
+Theorem represents_extensional {A} r (m : machine A) M N :
+  represents r m M -> represents r m N -> surface_observationally_equal M N.
+```
+
+<a id="declaration-represented-classes-finite"></a>
+
+### `represented_classes_finite`
+
+[surface_semantics.v:676](surface_semantics.v#L676)
+
+```coq
+Theorem represented_classes_finite {A} r (m : machine A) M : represents r m M ->
+  exists entries : list (loc * class), forall L c,
+    surface_classes M L = Some c <-> In (L,c) entries.
+```
+
+<a id="declaration-ghost-surface-prefix-safety"></a>
+
+### `ghost_surface_prefix_safety`
+
+[surface_semantics.v:735](surface_semantics.v#L735)
+
+```coq
+Corollary ghost_surface_prefix_safety {A} (K : class -> language A) (s : statement A) :
+  (forall m, program_prefix s initial_machine m ->
+    forall l, l < next_loc m -> prefix_language (K (classes m l)) (object_history m l)) <->
+  (forall M, surface_program_prefix s initial_surface M ->
+    forall L c, surface_classes M L = Some c -> prefix_language (K c) (surface_history M L)).
+```
+
+<a id="declaration-ghost-surface-completion-safety"></a>
+
+### `ghost_surface_completion_safety`
+
+[surface_semantics.v:742](surface_semantics.v#L742)
+
+```coq
+Corollary ghost_surface_completion_safety {A} (K : class -> language A) (s : statement A) :
+  (forall m, program_execution s initial_machine m ->
+    forall l, l < next_loc m -> K (classes m l) (object_history m l)) <->
+  (forall M, surface_program_execution s initial_surface M ->
+    forall L c, surface_classes M L = Some c -> K c (surface_history M L)).
+```
+
+<a id="declaration-monitored-error-context"></a>
+
+### `monitored_error_context`
+
+[runtime_monitor.v:88](runtime_monitor.v#L88)
+
+```coq
+Lemma monitored_error_context E m s : monitored_step (m,s) ProtocolError ->
+  monitored_step (m,plug E s) ProtocolError.
+```
+
+<a id="declaration-monitored-error-terminal"></a>
+
+### `monitored_error_terminal`
+
+[runtime_monitor.v:82](runtime_monitor.v#L82)
+
+```coq
+Lemma monitored_error_terminal out : monitored_execution ProtocolError out -> out = ProtocolError.
+```
+
+<a id="declaration-baseline-runtime-prefix-equivalence"></a>
+
+### `baseline_runtime_prefix_equivalence`
+
+[runtime_monitor.v:296](runtime_monitor.v#L296)
+
+```coq
+Theorem baseline_runtime_prefix_equivalence FT s : certified P -> check_program P FT s = true ->
+  forall m t, monitored_prefix s initial_machine (RuntimeState (m,t)) <->
+  finish_free s /\ execution (initial_machine,instrument s) (m,t).
+```
+
+<a id="declaration-copying-runtime-prefix-equivalence"></a>
+
+### `copying_runtime_prefix_equivalence`
+
+[runtime_monitor.v:315](runtime_monitor.v#L315)
+
+```coq
+Theorem copying_runtime_prefix_equivalence FT mode s : copying_certified P mode ->
+  check_program_with_copy P FT mode s = true ->
+  forall m t, monitored_prefix s initial_machine (RuntimeState (m,t)) <->
+  finish_free s /\ execution (initial_machine,instrument s) (m,t).
+```
+
+<a id="declaration-copying-primitive-history-to-regex"></a>
+
+### `copying_primitive_history_to_regex`
+
+[copying_residual_typestate.v:56](copying_residual_typestate.v#L56)
+
+```coq
+Theorem copying_primitive_history_to_regex g i g' G :
+  type_step_with_copy P FT mode g i g' -> environments_related P g G ->
+  exists G', regex_copy_type_step G i G' /\ environments_related P g' G'.
+```
+
+<a id="declaration-copying-primitive-regex-to-history"></a>
+
+### `copying_primitive_regex_to_history`
+
+[copying_residual_typestate.v:77](copying_residual_typestate.v#L77)
+
+```coq
+Theorem copying_primitive_regex_to_history G i G' g :
+  regex_copy_type_step G i G' -> environments_related P g G ->
+  exists g', type_step_with_copy P FT mode g i g' /\ environments_related P g' G'.
+```
+
+<a id="declaration-copying-statement-history-to-regex"></a>
+
+### `copying_statement_history_to_regex`
+
+[copying_residual_typestate.v:95](copying_residual_typestate.v#L95)
+
+```coq
+Theorem copying_statement_history_to_regex g s g' G :
+  typed_stmt_with_copy P FT mode g s g' -> environments_related P g G ->
+  exists G', regex_copy_typed_stmt G s G' /\ environments_related P g' G'.
+```
+
+<a id="declaration-copying-statement-regex-to-history"></a>
+
+### `copying_statement_regex_to_history`
+
+[copying_residual_typestate.v:107](copying_residual_typestate.v#L107)
+
+```coq
+Theorem copying_statement_regex_to_history G s G' g :
+  regex_copy_typed_stmt G s G' -> environments_related P g G ->
+  exists g', typed_stmt_with_copy P FT mode g s g' /\ environments_related P g' G'.
+```
+
+<a id="declaration-copying-residual-checker-correspondence"></a>
+
+### `copying_residual_checker_correspondence`
+
+[copying_residual_typestate.v:119](copying_residual_typestate.v#L119)
+
+```coq
+Theorem copying_residual_checker_correspondence g G s : environments_related P g G ->
+  ((exists g', check_stmt_with_copy P FT mode s g = Some g') <->
+   exists G', regex_copy_typed_stmt G s G').
+```
+
+<a id="declaration-copying-residual-program-correspondence"></a>
+
+### `copying_residual_program_correspondence`
+
+[copying_residual_typestate.v:149](copying_residual_typestate.v#L149)
+
+```coq
+Theorem copying_residual_program_correspondence s :
+  check_program_with_copy P FT mode s = true <->
+  finish_free s /\ regex_copy_typed_stmt [] (instrument s) [].
+```
+
+<a id="declaration-copying-regular-residual-program-correspondence"></a>
+
+### `copying_regular_residual_program_correspondence`
+
+[copying_residual_typestate.v:170](copying_residual_typestate.v#L170)
+
+```coq
+Theorem copying_regular_residual_program_correspondence s :
+  check_program_with_copy (regular_family spec) FT mode s = true <->
+  finish_free s /\ regex_copy_typed_stmt FT (fun c => closure_regex (spec c)) mode
+    [] (instrument s) [].
+```
+
+<a id="declaration-raw-step-iff-context"></a>
+
+### `raw_step_iff_context`
+
+[semantics.v:196](semantics.v#L196)
+
+```coq
+Theorem raw_step_iff_context {A} (m m' : machine A) s s' : raw_step (m,s) (m',s') <->
+  (exists E i, s=plug E i /\ s'=plug E Skip /\ primitive_step i m m') \/
+  (exists E t, s=plug E (Seq Skip t) /\ s'=plug E t /\ m'=m).
+```
+
+<a id="declaration-reachable-invariant"></a>
+
+### `reachable_invariant`
+
+[soundness.v:65](soundness.v#L65)
+
+```coq
+Theorem reachable_invariant s m u : check_program P FT s=true ->
+  execution (initial_machine,instrument s) (m,u) ->
+  exists g, invariant P FT m g /\ typed_stmt P FT g u [].
+```
+
+<a id="declaration-runtime-surface-guard"></a>
+
+### `runtime_surface_guard`
+
+[surface_monitor.v:22](surface_monitor.v#L22)
+
+```coq
+Lemma runtime_surface_guard {A} (P : protocol_family A) r s (m m' : machine A) M :
+  ghost_well_formed m -> represents r m M -> primitive_step s m m' ->
+  (runtime_guard P s m m' = true <-> surface_guard P s M).
+```
+
+<a id="declaration-ghost-surface-monitored-execution"></a>
+
+### `ghost_surface_monitored_execution`
+
+[surface_monitor.v:147](surface_monitor.v#L147)
+
+```coq
+Theorem ghost_surface_monitored_execution r m m' M s t :
+  ghost_well_formed m -> represents r m M ->
+  monitored_execution P (RuntimeState (m,s)) (RuntimeState (m',t)) ->
+  exists r' M', extends_on (next_loc m) r r' /\
+    surface_monitored_execution (SurfaceState (M,s)) (SurfaceState (M',t)) /\
+    represents r' m' M'.
+```
+
+<a id="declaration-surface-ghost-monitored-execution"></a>
+
+### `surface_ghost_monitored_execution`
+
+[surface_monitor.v:170](surface_monitor.v#L170)
+
+```coq
+Theorem surface_ghost_monitored_execution r m M M' s t :
+  ghost_well_formed m -> represents r m M ->
+  surface_monitored_execution (SurfaceState (M,s)) (SurfaceState (M',t)) ->
+  exists r' m', extends_on (next_loc m) r r' /\
+    monitored_execution P (RuntimeState (m,s)) (RuntimeState (m',t)) /\
+    represents r' m' M'.
+```
+
+<a id="declaration-ghost-surface-error-equivalence"></a>
+
+### `ghost_surface_error_equivalence`
+
+[surface_monitor.v:227](surface_monitor.v#L227)
+
+```coq
+Theorem ghost_surface_error_equivalence s :
+  monitored_program P s initial_machine ProtocolError <->
+  surface_monitored_program s initial_surface SurfaceProtocolError.
+```
+
+<a id="declaration-surface-typestate-prefix-sound"></a>
+
+### `surface_typestate_prefix_sound`
+
+[surface_monitor.v:311](surface_monitor.v#L311)
+
+```coq
+Theorem surface_typestate_prefix_sound FT s M : certified P -> check_program P FT s = true ->
+  surface_program_prefix s initial_surface M ->
+  forall l c, surface_classes M l = Some c -> prefix_language (protocol P c) (surface_history M l).
+```
+
+<a id="declaration-surface-typestate-completion-sound"></a>
+
+### `surface_typestate_completion_sound`
+
+[surface_monitor.v:319](surface_monitor.v#L319)
+
+```coq
+Theorem surface_typestate_completion_sound FT s M : certified P -> check_program P FT s = true ->
+  surface_program_execution s initial_surface M ->
+  forall l c, surface_classes M l = Some c -> protocol P c (surface_history M l).
+```
+
+<a id="declaration-surface-copying-prefix-sound"></a>
+
+### `surface_copying_prefix_sound`
+
+[surface_monitor.v:344](surface_monitor.v#L344)
+
+```coq
+Theorem surface_copying_prefix_sound FT mode s M :
+  copying_certified P mode -> check_program_with_copy P FT mode s = true ->
+  surface_program_prefix s initial_surface M ->
+  forall l c, surface_classes M l = Some c -> prefix_language (protocol P c) (surface_history M l).
+```
+
+<a id="declaration-surface-copying-completion-sound"></a>
+
+### `surface_copying_completion_sound`
+
+[surface_monitor.v:353](surface_monitor.v#L353)
+
+```coq
+Theorem surface_copying_completion_sound FT mode s M :
+  copying_certified P mode -> check_program_with_copy P FT mode s = true ->
+  surface_program_execution s initial_surface M ->
+  forall l c, surface_classes M l = Some c -> protocol P c (surface_history M l).
+```
+
+<a id="declaration-surface-runtime-prefix-equivalence"></a>
+
+### `surface_runtime_prefix_equivalence`
+
+[surface_monitor.v:327](surface_monitor.v#L327)
+
+```coq
+Theorem surface_runtime_prefix_equivalence FT s : certified P -> check_program P FT s = true ->
+  forall M t, surface_monitored_prefix s initial_surface (SurfaceState (M,t)) <->
+    finish_free s /\ surface_execution (initial_surface,instrument s) (M,t).
+```
+
+<a id="declaration-surface-runtime-equivalence"></a>
+
+### `surface_runtime_equivalence`
+
+[surface_monitor.v:332](surface_monitor.v#L332)
+
+```coq
+Theorem surface_runtime_equivalence FT s : certified P -> check_program P FT s = true ->
+  forall M, surface_monitored_program s initial_surface (SurfaceState (M,Skip)) <->
+    surface_program_execution s initial_surface M.
+```
+
+<a id="declaration-surface-runtime-no-error"></a>
+
+### `surface_runtime_no_error`
+
+[surface_monitor.v:337](surface_monitor.v#L337)
+
+```coq
+Theorem surface_runtime_no_error FT s : certified P -> check_program P FT s = true ->
+  ~ surface_monitored_program s initial_surface SurfaceProtocolError.
+```
+
+<a id="declaration-surface-copying-runtime-prefix-equivalence"></a>
+
+### `surface_copying_runtime_prefix_equivalence`
+
+[surface_monitor.v:362](surface_monitor.v#L362)
+
+```coq
+Theorem surface_copying_runtime_prefix_equivalence FT mode s : copying_certified P mode ->
+  check_program_with_copy P FT mode s = true ->
+  forall M t, surface_monitored_prefix s initial_surface (SurfaceState (M,t)) <->
+    finish_free s /\ surface_execution (initial_surface,instrument s) (M,t).
+```
+
+<a id="declaration-surface-copying-runtime-equivalence"></a>
+
+### `surface_copying_runtime_equivalence`
+
+[surface_monitor.v:368](surface_monitor.v#L368)
+
+```coq
+Theorem surface_copying_runtime_equivalence FT mode s : copying_certified P mode ->
+  check_program_with_copy P FT mode s = true ->
+  forall M, surface_monitored_program s initial_surface (SurfaceState (M,Skip)) <->
+    surface_program_execution s initial_surface M.
+```
+
+<a id="declaration-surface-copying-runtime-no-error"></a>
+
+### `surface_copying_runtime_no_error`
+
+[surface_monitor.v:374](surface_monitor.v#L374)
+
+```coq
+Theorem surface_copying_runtime_no_error FT mode s : copying_certified P mode ->
+  check_program_with_copy P FT mode s = true ->
+  ~ surface_monitored_program s initial_surface SurfaceProtocolError.
+```
+
+<a id="declaration-surface-completion-sound-iff-certified"></a>
+
+### `surface_completion_sound_iff_certified`
+
+[surface_monitor.v:396](surface_monitor.v#L396)
+
+```coq
+Theorem surface_completion_sound_iff_certified FT :
+  (forall s M, check_program P FT s = true ->
+    surface_program_execution s initial_surface M ->
+    forall l c, surface_classes M l = Some c -> protocol P c (surface_history M l)) <->
+  certified P.
+```
+
+<a id="declaration-noncanonical-surface-execution"></a>
+
+### `noncanonical_surface_execution`
+
+[surface_monitor.v:414](surface_monitor.v#L414)
+
+```coq
+Example noncanonical_surface_execution {A} c d :
+  surface_program_execution (@noncanonical_source A c d) initial_surface (noncanonical_final c d).
+```
+
+<a id="declaration-noncanonical-surface-equipped"></a>
+
+### `noncanonical_surface_equipped`
+
+[surface_monitor.v:435](surface_monitor.v#L435)
+
+```coq
+Example noncanonical_surface_equipped {A} c d :
+  exists r m, program_execution (@noncanonical_source A c d) initial_machine m /\
+    represents r m (noncanonical_final c d).
+```
+
+<a id="declaration-canonical-statement-typing"></a>
+
+### `canonical_statement_typing`
+
+[residual_invariants.v:89](residual_invariants.v#L89)
+
+```coq
+Theorem canonical_statement_typing g s g' : typed_stmt P FT g s g' ->
+  regex_typed_stmt FT initial (canonical_env initial g) s (canonical_env initial g').
+```
+
+<a id="declaration-canonical-copying-statement-typing"></a>
+
+### `canonical_copying_statement_typing`
+
+[residual_invariants.v:166](residual_invariants.v#L166)
+
+```coq
+Theorem canonical_copying_statement_typing g s g' : typed_stmt_with_copy P FT mode g s g' ->
+  regex_copy_typed_stmt FT initial mode (canonical_env initial g) s (canonical_env initial g').
+```
+
+<a id="declaration-reachable-residual-configuration"></a>
+
+### `reachable_residual_configuration`
+
+[residual_invariants.v:124](residual_invariants.v#L124)
+
+```coq
+Theorem reachable_residual_configuration s m t :
+  check_program P FT s=true -> execution (initial_machine,instrument s) (m,t) ->
+  exists G, regex_typed_stmt FT initial G t [] /\ residual_runtime_invariant m G.
+```
+
+<a id="declaration-copying-reachable-residual-configuration"></a>
+
+### `copying_reachable_residual_configuration`
+
+[residual_invariants.v:208](residual_invariants.v#L208)
+
+```coq
+Theorem copying_reachable_residual_configuration s m t : copying_certified P mode ->
+  check_program_with_copy P FT mode s=true -> execution (initial_machine,instrument s) (m,t) ->
+  exists G V, regex_copy_typed_stmt FT initial mode G t [] /\
+    copying_residual_runtime_invariant m G V.
+```
+
+<a id="declaration-regular-reachable-residual-configuration"></a>
+
+### `regular_reachable_residual_configuration`
+
+[residual_invariants.v:226](residual_invariants.v#L226)
+
+```coq
+Theorem regular_reachable_residual_configuration s m t :
+  check_program (regular_family spec) FT s=true ->
+  execution (initial_machine,instrument s) (m,t) ->
+  exists G, regex_typed_stmt FT (fun c => closure_regex (spec c)) G t [] /\
+    residual_runtime_invariant (regular_family spec) m G.
+```
+
+<a id="declaration-copying-regular-reachable-residual-configuration"></a>
+
+### `copying_regular_reachable_residual_configuration`
+
+[residual_invariants.v:235](residual_invariants.v#L235)
+
+```coq
+Theorem copying_regular_reachable_residual_configuration mode s m t :
+  copying_certified (regular_family spec) mode ->
+  check_program_with_copy (regular_family spec) FT mode s=true ->
+  execution (initial_machine,instrument s) (m,t) ->
+  exists G V, regex_copy_typed_stmt FT (fun c => closure_regex (spec c)) mode G t [] /\
+    copying_residual_runtime_invariant (regular_family spec) FT m G V.
 ```

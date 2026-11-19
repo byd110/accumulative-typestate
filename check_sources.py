@@ -35,6 +35,15 @@ for path in paths:
     for match in re.finditer(r"\b(?:Admitted|admit|Abort|Axiom|Axioms|Parameter|Parameters)\b", source):
         line = source.count("\n", 0, match.start()) + 1
         errors.append(f"{path.relative_to(root)}:{line}: {match.group()}")
+    if path.parent == root:
+        obsolete = r"\b(?:Branch|Do|instruction|paths|paths_spec|path_seq|typed_trace|check_trace|monitored_trace|retire)\b"
+        for match in re.finditer(obsolete, source):
+            line = source.count("\n", 0, match.start()) + 1
+            errors.append(f"{path.relative_to(root)}:{line}: obsolete interface {match.group()}")
+    if path.name == "semantics.v":
+        for match in re.finditer(r"\b(?:protocols|typestate|soundness|copying_soundness|runtime_monitor)\b", source):
+            line = source.count("\n", 0, match.start()) + 1
+            errors.append(f"semantics.v:{line}: raw semantics depends on {match.group()}")
 if errors:
     print("\n".join(errors), file=sys.stderr)
     sys.exit(1)

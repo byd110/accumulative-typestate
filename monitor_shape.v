@@ -35,8 +35,8 @@ Proof.
   - intros q f t Ht. pose proof (monitor_heap_bound HS q f Ht); lia.
 Qed.
 
-Lemma monitor_step_shape {A} i (m m' : machine A) :
-  monitor_shape m -> raw_step i m m' -> monitor_shape m'.
+Lemma monitor_primitive_shape {A} i (m m' : machine A) :
+  monitor_shape m -> primitive_step i m m' -> monitor_shape m'.
 Proof.
   intros HS HR. destruct HR.
   - unfold allocate. apply monitor_install_shape; auto; lia.
@@ -57,17 +57,21 @@ Proof.
     + exact (monitor_refs_bound HS).
     + exact (monitor_owners_bound HS).
     + exact (monitor_heap_bound HS).
-  - constructor; cbn [retire refs next_epoch owners next_loc heap].
-    + intros y d Hy. destruct (Nat.eq_dec y x) as [->|Hne].
-      * rewrite get_put_same in Hy; discriminate.
-      * rewrite get_put_other in Hy by exact Hne.
-        eapply monitor_refs_bound; eauto.
+  - constructor; cbn [clear_refs refs next_epoch owners next_loc heap].
+    + intros y d Hy; discriminate.
     + apply (monitor_owners_bound HS).
     + apply (monitor_heap_bound HS).
 Qed.
 
-Lemma monitor_execution_shape {A} is (m m' : machine A) :
-  monitor_shape m -> execution is m m' -> monitor_shape m'.
+Lemma monitor_step_shape {A} (c d : configuration A) :
+  monitor_shape (fst c) -> raw_step c d -> monitor_shape (fst d).
+Proof.
+  intros HS HR; induction HR; simpl in *; auto.
+  eapply monitor_primitive_shape; eauto.
+Qed.
+
+Lemma monitor_execution_shape {A} (c d : configuration A) :
+  monitor_shape (fst c) -> execution c d -> monitor_shape (fst d).
 Proof.
   intros HS HE. induction HE; auto.
   apply IHHE. eapply monitor_step_shape; eauto.
@@ -77,8 +81,8 @@ Theorem monitor_program_prefix_target {A} (s : statement A) m x e :
   program_prefix s initial_machine m -> get (refs m) x = Some e ->
   owners m e < next_loc m.
 Proof.
-  intros [p [q [HP HE]]] Hr.
+  intros [HF [t HE]] Hr.
   assert (HS : monitor_shape m).
-  { eapply monitor_execution_shape; eauto. apply monitor_initial_shape. }
+  { exact (@monitor_execution_shape A (initial_machine,instrument s) (m,t) monitor_initial_shape HE). }
   apply (monitor_owners_bound HS). eapply monitor_refs_bound; eauto.
 Qed.

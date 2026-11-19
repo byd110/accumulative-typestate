@@ -12,7 +12,7 @@ Set Implicit Arguments.
    "go out of scope" observation.  Treating completion as an observable
    permission makes our two premises instances of one persistence law.
    These observations are specifications, not added runtime instructions:
-   in particular, the existing Finish instruction still emits no event. *)
+   in particular, the bulk Finish operation still emits no event. *)
 Inductive protocol_observation (A : Type) :=
 | ObserveCall (a : A)
 | ObserveCompletion.

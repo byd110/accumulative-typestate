@@ -142,35 +142,6 @@ Proof.
     eapply inv_retired; eauto.
 Qed.
 
-Lemma invariant_retire m g x e : invariant m g -> get (refs m) x = Some e ->
-  accepts P (classes m (owners m e)) (project e (events m)) = true ->
-  invariant (retire m x) (put g x None).
-Proof.
-  intros HI Ex HA. constructor; cbn [retire refs next_epoch next_loc owners classes heap events].
-  - intros y d Ey; destruct (Nat.eq_dec y x) as [->|Hne].
-    + rewrite get_put_same in Ey; discriminate.
-    + rewrite get_put_other in Ey by exact Hne; eapply inv_refs; eauto.
-  - intros y z d Ey Ez.
-    destruct (Nat.eq_dec y x) as [->|Hy]; [rewrite get_put_same in Ey; discriminate|].
-    destruct (Nat.eq_dec z x) as [->|Hz]; [rewrite get_put_same in Ez; discriminate|].
-    rewrite get_put_other in Ey by exact Hy; rewrite get_put_other in Ez by exact Hz.
-    eapply inv_unique; eauto.
-  - exact (inv_owners HI).
-  - exact (inv_objects HI).
-  - exact (inv_events HI).
-  - exact (inv_heap HI).
-  - intros y; destruct (Nat.eq_dec y x) as [->|Hne].
-    + rewrite !get_put_same; reflexivity.
-    + rewrite !get_put_other by exact Hne; apply inv_agree; exact HI.
-  - intros y c w E; destruct (Nat.eq_dec y x) as [->|Hne].
-    + rewrite get_put_same in E; discriminate.
-    + rewrite get_put_other in E by exact Hne; eapply inv_viable; eauto.
-  - intros d Hd Hdead; destruct (Nat.eq_dec d e) as [->|Hne]; auto.
-    apply (inv_retired HI Hd); intros y Ey.
-    destruct (Nat.eq_dec y x) as [->|Hy]; [congruence|].
-    apply (Hdead y); rewrite get_put_other by exact Hy; exact Ey.
-Qed.
-
 Lemma invariant_store m g l f t : invariant m g ->
   l < next_loc m -> t < next_loc m -> classes m t = FT (classes m l) f ->
   invariant (store m l f t) g.
@@ -187,8 +158,27 @@ Proof.
   - eapply inv_heap; eauto.
 Qed.
 
+Lemma invariant_clear_refs m g : invariant m g -> all_complete P g=true ->
+  invariant (clear_refs m) [].
+Proof.
+  intros HI HC. pose proof (proj1 (all_complete_spec P g) HC) as HCfull.
+  constructor; cbn [clear_refs refs next_epoch next_loc owners classes heap events].
+  - intros; discriminate.
+  - intros; discriminate.
+  - exact (inv_owners HI).
+  - exact (inv_objects HI).
+  - exact (inv_events HI).
+  - exact (inv_heap HI).
+  - reflexivity.
+  - intros; discriminate.
+  - intros e He _. destruct (liveb (refs m) e) eqn:E.
+    + apply liveb_spec in E; destruct E as [x Ex]. eapply HCfull; eapply agree_ref; eauto.
+    + apply (inv_retired HI He). intros x Ex.
+      assert (liveb (refs m) e=true) by (apply liveb_spec; eauto). congruence.
+Qed.
+
 Lemma preservation m g i m' g' : invariant m g ->
-  raw_step i m m' -> type_step P FT g i g' -> invariant m' g'.
+  primitive_step i m m' -> type_step P FT g i g' -> invariant m' g'.
 Proof.
   intros HI HR HT. destruct HR; inversion HT; subst; unfold qualifier, class in *.
   - eapply invariant_allocate; eauto.
@@ -207,16 +197,35 @@ Proof.
   - match goal with E : get ?env x = Some (_,_) |- _ =>
       let Eq := fresh "Eagree" in pose proof (agree_ref _ HI H) as Eq; unfold qualifier, class in Eq; rewrite E in Eq; inversion Eq; subst end.
     eapply invariant_emit; eauto.
-  - match goal with E : get ?env x = Some (_,_) |- _ =>
-      let Eq := fresh "Eagree" in pose proof (agree_ref _ HI H) as Eq; unfold qualifier, class in Eq; rewrite E in Eq; inversion Eq; subst end.
-    eapply invariant_retire; eauto.
+  - eapply invariant_clear_refs; eauto.
 Qed.
 
-Lemma trace_preservation m g is m' g' : invariant m g ->
-  execution is m m' -> typed_trace P FT g is g' -> invariant m' g'.
+Theorem step_preservation m s m' s' : raw_step (m,s) (m',s') ->
+  forall g gf, invariant m g -> typed_stmt P FT g s gf ->
+  exists g', invariant m' g' /\ typed_stmt P FT g' s' gf.
 Proof.
-  intros HI HE; revert g HI g'; induction HE; intros g HI g' HT; inversion HT; subst; auto.
-  eapply IHHE; eauto. eapply preservation; eauto.
+  intros HR. remember (m,s) as c eqn:Ec; remember (m',s') as d eqn:Ed.
+  revert m s m' s' Ec Ed. induction HR; intros u r u' r' Ec Ed g gf HI HT;
+    inversion Ec; inversion Ed; subst.
+  - exists gf; split; [|apply type_skip]. eapply preservation; eauto.
+    eapply typed_stmt_primitive; [| |exact HT]; intros; subst;
+      match goal with Hp : primitive_step _ _ _ |- _ => inversion Hp end; discriminate.
+  - destruct (typed_stmt_seq HT) as [gm [Hs Ht]].
+    destruct (IHHR _ _ _ _ eq_refl eq_refl _ _ HI Hs) as [g' [HI' Hs']].
+    exists g'; split; auto. eapply type_seq; eauto.
+  - destruct (typed_stmt_seq HT) as [gm [Hs Ht]].
+    apply typed_stmt_skip in Hs; subst. exists g; auto.
 Qed.
-
+Theorem execution_preservation c d : execution c d ->
+  forall g gf, invariant (fst c) g -> typed_stmt P FT g (snd c) gf ->
+  exists g', invariant (fst d) g' /\ typed_stmt P FT g' (snd d) gf.
+Proof.
+  intros HE; induction HE; intros g gf HI HT; [exists g; auto|].
+  destruct c as [m s], d as [m' s']; simpl in *.
+  destruct (step_preservation H HI HT) as [gm [HM HS]]. eapply IHHE; eauto.
+Qed.
+Lemma context_preservation E m s m' s' g gf :
+  invariant m g -> typed_stmt P FT g (plug E s) gf -> raw_step (m,s) (m',s') ->
+  exists g', invariant m' g' /\ typed_stmt P FT g' (plug E s') gf.
+Proof. intros HI HT HR; eapply step_preservation; eauto using raw_step_context. Qed.
 End Invariants.

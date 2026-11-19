@@ -62,26 +62,29 @@ Proof.
   pose proof (agree_ref x HI Ex) as E. rewrite HG in E; discriminate.
 Qed.
 
-(* Prefixes range over every branch path. The raw semantics has no protocol
-   premises; field-initialization safety is deliberately a separate issue. *)
+Theorem reachable_invariant s m u : check_program P FT s=true ->
+  execution (initial_machine,instrument s) (m,u) ->
+  exists g, invariant P FT m g /\ typed_stmt P FT g u [].
+Proof.
+  intros HC HE. apply check_program_spec in HC; destruct HC as [_ HC].
+  exact (execution_preservation HE (invariant_initial P FT) HC).
+Qed.
+
+(* Safety ranges over actual reachable configurations, without protocol guards. *)
 Theorem typestate_prefix_sound s m : certified P -> check_program P FT s = true ->
   program_prefix s initial_machine m ->
   forall l, l < next_loc m -> prefix_language (protocol P (classes m l)) (object_history m l).
 Proof.
-  intros HC HT [p [q [HP HE]]].
-  destruct (check_program_path P FT HT HP) as [g [HG Hempty]].
-  destruct (@typed_trace_split A P FT [] p q g HG) as [gm [Hp Hq]].
-  eapply invariant_prefix_safe; eauto. eapply trace_preservation; eauto.
-  apply invariant_initial.
+  intros HC HT [_ [t HE]]. apply check_program_spec in HT; destruct HT as [_ HT].
+  destruct (execution_preservation HE (invariant_initial P FT) HT) as [g [HI HR]].
+  eapply invariant_prefix_safe; eauto.
 Qed.
-
 Theorem typestate_completion_sound s m : certified P -> check_program P FT s = true ->
   program_execution s initial_machine m ->
   forall l, l < next_loc m -> protocol P (classes m l) (object_history m l).
 Proof.
-  intros HC HT [p [HP HE]].
-  destruct (check_program_path P FT HT HP) as [g [HG Hempty]].
-  eapply invariant_complete; eauto. eapply trace_preservation; eauto.
-  apply invariant_initial.
+  intros HC HT [_ HE]. apply check_program_spec in HT; destruct HT as [_ HT].
+  destruct (execution_preservation HE (invariant_initial P FT) HT) as [g [HI HR]].
+  apply typed_stmt_skip in HR; subst g. eapply invariant_complete; eauto.
 Qed.
 End Soundness.

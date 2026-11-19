@@ -14,6 +14,16 @@ claims, exact theorem signatures, hypotheses, and remaining gaps. The
 [paper-side artifact guide](../paper/ARTIFACT_README.md) gives a shorter result
 index. Rocq is the only planned submission artifact.
 
+For the paper's programming language, start with `statement` and `context` in
+[syntax.v](syntax.v), then `surface_monitored_step` in
+[surface_monitor.v](surface_monitor.v). These define straight-line statements,
+left-to-right evaluation contexts, runtime protocol checks, and terminal errors.
+[surface_semantics.v](surface_semantics.v) supplies the four-map state and
+primitive updates. The unguarded relations in that file and
+[semantics.v](semantics.v) support the soundness proofs. Bidirectional
+simulations relate ghost and surface executions, both raw and monitored;
+separate theorems establish that the guards cannot fail for accepted programs.
+
 ## Build and check
 
 Tested with Coq/Rocq **8.20.0**, MathComp ssreflect **2.3.0**, Hierarchy Builder
@@ -43,11 +53,13 @@ make clean       # remove generated proof artifacts
 ```
 
 For a clean verification, run `make clean` first, then the three build/check
-commands. Each must exit with status zero. `make check` checks all 44 listed
-sources and kernel-checks the audit/example dependency closure. `make assumptions`
-prints 88 reports, each expected to say `Closed under the global context`.
-The 32 project sources contain 2,556 specification lines and 3,146 proof lines
-(5,702 total by `coqwc *.v`), excluding the 12 bundled RegLang sources and comments.
+commands. Each must exit with status zero. `make check` scans all 49 sources
+listed in `_CoqProject` and kernel-checks the audit/example dependency closure.
+`make assumptions` prints 185 reports, each expected to say
+`Closed under the global context`. The 37 project sources contain 3,640
+specification lines and 4,393 proof lines (8,033 total by `coqwc *.v`),
+excluding the 12 bundled RegLang sources and comments. `_CoqProject` and
+`audit.v` are the authoritative source and audit inventories.
 
 `_CoqProject` maps project modules to `Accumulation` and the bundled library to
 `RegLang`. Coq reports an overlapping-loadpath warning because the latter is a
@@ -71,11 +83,11 @@ certification and typestate results do not depend on that argument.
 | Coverage | `coverage.v`: executable block recognizer and equivalence to the singleton regex. `coverage_simulation.v`: the singleton automaton's reachable-state simulation, equivalence to that recognizer, and an at-most-`length(seed)+1` state bound. |
 | Finite certification | `finite_shuffles.v`: complete shuffle enumeration. `certification.v`: Boolean seed/regex certification iff shuffle closedness, and checked rejection witnesses. |
 | Decidable protocols | `protocols.v`: verified completion/viability interface. `regular_protocols.v`: explicit closure regex and an implementation using normalized-seed coverage for membership and DFA residual inhabitation for viability. |
-| Programming language | `syntax.v`: instructions, statements, finite maps, path enumeration. `semantics.v`: allocation, copy, heap load/store, calls, finish, and execution. |
-| Runtime protocol checks | `monitor_shape.v`: raw references and heap targets denote allocated locations. `runtime_monitor.v`: explicit protocol-error outcomes, object-history call checks, allocation viability, all-object completion at program exit, and raw/monitored equivalence for accepted baseline and copying programs. |
-| Typestate system | `typestate.v`: per-reference residuals, declarative rules, executable checker, equivalence, and universal branch checking. |
+| Programming language | `syntax.v`: direct statements, finite maps, evaluation contexts, the finish-free source fragment, and single-exit instrumentation. `semantics.v`: unguarded primitive updates, configuration steps, finite execution, and the source/instrumented execution equivalence. `surface_semantics.v`: bidirectional ghost/surface simulation with arbitrary fresh locations, extensional observations, and all-object property transfer. |
+| Runtime protocol checks | `monitor_shape.v`: raw references and heap targets denote allocated locations. `runtime_monitor.v`: explicit protocol-error outcomes, object-history call checks, allocation viability, a single all-object completion guard at bulk `Finish`, contextual errors, and raw/monitored prefix and final equivalence for accepted baseline and copying programs. `surface_monitor.v`: independent guarded surface rules, guard correspondence, successful/error execution simulations, and surface safety, completion, necessity, and monitor equivalence. |
+| Typestate system | `typestate.v`: one class/history environment, structural statement typing/checking, current-binding bulk completion, and checker equivalence. `residual_typestate.v` and `copying_residual_typestate.v`: baseline and optional history/regex representation, primitive and structural transfer, and program acceptance correspondence. `residual_invariants.v`: reachable residual expression environments, binding agreement, viable views, and retired completion. |
 | Metatheory | `invariants.v`: binding epochs, heap/class agreement, retired obligations, and preservation. `soundness.v`: prefix safety and all-object completion. `necessity.v`: completion soundness of the baseline core checker iff every class protocol is shuffle closed. `regular_soundness.v`: finite class-table certification composed with the client checker. |
-| Optional history copying | `copying_typestate.v`: per-class mode and exact recovery of the original checker. `copying_languages.v`, `copying_soundness.v`: completion-continuation invariant and safety for the existing raw semantics. `residual_certification.v`: exact finite DFA certificate. `copying_regular_soundness.v`: certified regular-seed integration. |
+| Optional history copying | `copying_typestate.v`: per-class mode and exact recovery of the original checker. `copying_languages.v`, `copying_soundness.v`: completion-continuation invariant, bulk-clear and configuration preservation, and source-program safety. `residual_certification.v`: exact finite DFA certificate. `copying_regular_soundness.v`: certified regular-seed integration. |
 | Accumulation relationship | `accumulation_bridge.v`: first-error subsequence law, exact safety/residual-shuffle correspondence, and sufficient completion contract. `accumulation_integration.v`: observation interpretation, existing finite certificates, and client-soundness consequences. `accumulation_examples.v`: an inhabited contract and separating examples. `kellogg_separation.v`: the first-error separation and a concrete unsafe client when copying lacks its certificate. |
 | Verification | `examples.v`, `certification_examples.v`, `copying_examples.v`, `residual_certification_examples.v`, `accumulation_examples.v`, `runtime_monitor_examples.v`, `audit.v`, and `check_sources.py`. |
 
@@ -98,8 +110,27 @@ known differences from upstream, and [CeCILL-B license](RegLang/LICENSE).
   their shuffle, and a proof that the shuffled history is not accepted.
 - `regex_counterexample_complete` and `regex_counterexample_none`: rejection
   always returns a witness, and witness absence is equivalent to certification.
-- `check_step_sound` / `check_step_complete`, `check_trace_spec`: the executable
+- `check_step_sound` / `check_step_complete`, `check_stmt_spec`, `check_program_spec`: the executable
   client checker implements the declarative rules exactly.
+- `instrument_single_exit`, `source_execution_iff`, and
+  `source_execution_no_early_exit`: source programs exclude `Finish`, and
+  instrumentation appends exactly one event-free bulk exit after source execution.
+- `residual_program_correspondence` / `regular_residual_program_correspondence`:
+  the baseline history checker accepts exactly the instrumented programs typed
+  by the regular-expression rules. `copying_residual_program_correspondence`
+  and `copying_regular_residual_program_correspondence` prove the same equivalence
+  for optional inheritance, copying the source expression exactly when enabled. Related environments agree through current
+  lookups; arbitrary expressions need not be representable by a class history.
+- `reachable_residual_configuration` / `copying_reachable_residual_configuration`:
+  every reachable configuration of an accepted source has a regex environment
+  that types its remaining statement to the empty environment. Runtime bindings
+  denote the corresponding viable residuals; retired views are complete. The
+  copying theorem retains the completing-continuation invariant for overlapping
+  views. Regular-seed variants discharge the initial representation premise.
+- `ghost_surface_execution` / `surface_ghost_execution`: finite executions
+  correspond in both directions after erasing epochs and renaming allocated
+  locations. `ghost_surface_prefix_safety` / `ghost_surface_completion_safety`
+  transfer properties of every allocated object, including unreachable ones.
 - `typestate_prefix_sound` / `typestate_completion_sound`: accepted programs are
   safe at every executable prefix and complete on termination, for every
   allocated object, including unreachable objects.
@@ -110,10 +141,16 @@ known differences from upstream, and [CeCILL-B license](RegLang/LICENSE).
   programs have exactly the same successful final states in raw and monitored
   execution. The raw-to-monitored direction establishes that guards do not
   remove accepted executions; error freedom is not obtained by assuming guards.
+  `baseline_runtime_prefix_equivalence` and `copying_runtime_prefix_equivalence`
+  also preserve each reachable residual statement. `surface_runtime_*` and
+  `surface_copying_runtime_*` establish the corresponding results for the
+  paper-style surface maps, with arbitrary fresh location names.
 - `completion_sound_iff_certified`: raw completion soundness of this baseline core
   checker is equivalent to shuffle closedness of every class protocol. The
   converse realizes any two complete histories and their chosen interleaving
   by an accepted, terminating two-alias client.
+  `surface_completion_sound_iff_certified` transfers the equivalence to raw
+  surface executions; successful checked completion is not its premise.
 - `regular_program_prefix_sound` / `regular_program_completion_sound`: the same
   guarantees after successful Boolean certification of a finite class table.
 
@@ -125,32 +162,36 @@ including an unreachable allocated object and overlapping inherited views.
 protocol-invalid call: safety is a theorem about accepted programs.
 The corresponding monitored execution reports `ProtocolError`, as shown by
 `invalid_call_monitor_errors`. `runtime_monitor_examples.v` also checks invalid
-allocation, incomplete exit for an unreachable object, staggered retirement of
-two objects, and successful baseline and inherited-history executions.
+allocation, incomplete exit for an unreachable object, a completed binding while
+another continues, and successful baseline and inherited-history executions.
+`noncanonical_surface_execution` and `noncanonical_surface_equipped` allocate
+locations 37 and 5 and reconstruct a matching ghost execution. Both objects
+remain observable after bulk exit removes their references.
 
 ### Runtime checks and the program boundary
 
-`runtime_monitor.v` keeps the raw operations unchanged and adds protocol checks
-with explicit success and error outcomes. Allocation requires a viable empty
-history. A call checks the updated aggregate history of its receiver object;
-`runtime_call_guard` equates that test to viability of the old history followed
-by the called event. Copying, loads, stores, and individual `Finish x` retirements
-do not alter object histories and have no additional protocol guard.
+`runtime_monitor.v` adds protocol guards to direct configuration steps.
+Allocation requires a viable empty history. A call checks the updated aggregate
+history of its receiver object; `runtime_call_guard` relates that test to the
+old history followed by the called event. Copying, loads, and stores preserve
+object histories and need no protocol guard.
 
-At the end of the selected program path, `runtime_exit_check` checks acceptance
-of every allocated object's history, including unreachable objects. This is a
-single program-boundary check, not a check at each recursive trace suffix or
-individual retirement. `runtime_exit_check_retire` proves that retirement leaves
-this aggregate test unchanged. The static checker still checks each binding's
-completion when it retires, which is a stronger sufficient discipline.
+A source program satisfies `finish_free`; its instrumented form is `Seq s Finish`.
+The single bulk `Finish` clears all reference bindings without changing objects,
+fields, classes, ownership, or events. The raw rule has no protocol premise.
+Its monitored counterpart checks `runtime_exit_check` once, accepting exactly
+when every allocated object's history is complete. There is no second check
+outside execution. `runtime_exit_check_clear` proves that clearing references
+preserves this aggregate predicate. Failed guards produce terminal
+`ProtocolError`, which evaluation contexts propagate without executing their
+continuation.
 
-The new monitor is formalized over the existing core. It does not supply the
-separate translation from paper-level bulk `finish`, automatic exit insertion,
-regular-expression-valued environments, and environment sets to this core's
-individual retirements, word histories, and paths. The core final guard matches
-the paper's all-object completion predicate; the full surface translation remains
-an explicit boundary. As before, undefined reference/field accesses have no raw
-step and are not reclassified as protocol errors or proved impossible here.
+The static exit rule checks every current binding and returns the empty
+environment. `all_complete_spec` ignores shadowed entries and states the exact
+lookup-based obligation. `invariant_clear_refs` and `ci_clear_refs` retain
+previously retired obligations while completing every still-live epoch.
+Undefined references and field loads have no primitive step; the development
+does not reclassify them as protocol errors or prove initialization progress.
 
 ## Relationship to Accumulation Analysis
 
@@ -184,7 +225,7 @@ Persistent completion is the separate premise
 `u ⊑ v -> K u -> P v -> K v`. It corresponds to requiring completion
 permission to persist, motivated by the source paper's treatment
 of acceptance as a legal “go out of scope” observation. The observation
-interface adds no runtime event: our `Finish` still only retires a binding.
+interface adds no runtime event: bulk `Finish` clears all current bindings and preserves object histories.
 No comparison of the two analyses' accepted programs is asserted, and no
 new executable test for the extracted laws is introduced.
 
@@ -215,20 +256,24 @@ global context.
 
 A qualifier is a class and its local history. Its denotation is the exact left
 residual `history⁻¹ K`. A call appends one event, viability tests nonemptiness,
-and retirement tests nullability. The checker contains no locations, epochs,
+and completion tests nullability. The checker contains no locations, epochs,
 heap-object histories, or alias sets. This history representation is a simple
 verified implementation of residuals, not a minimized-automaton implementation.
 
 In the baseline mode, allocation, copying, and field loading start a **fresh binding history**.
-Overwriting a binding first requires its old history to be complete. `finish`
-removes a binding and does not deallocate or invalidate the object. Stores
-preserve local histories and check field classes. Each branch is checked
-separately. Every retained path must discharge every final binding.
-This implementation enumerates paths, whereas the paper propagates sets of
-environments. Their implementation correspondence is unmechanized, and path
-enumeration can repeat identical environments. Since `Finish x` rejects an
-unbound variable, branches with different live bindings need appropriate
-retirement sequences within those core branches.
+Overwriting a binding first requires its old history to be complete. Bulk
+`Finish` removes all bindings and does not deallocate objects. Stores preserve
+local histories and check field classes. `typed_stmt` and `check_stmt` compose
+sequencing through one intermediate environment. `Skip` preserves that
+environment and is terminal operationally. Public program checking and execution
+take finish-free sources and append the common exit automatically.
+
+`residual_typestate.v` relates each class/history qualifier to an expression
+whose denotation is its exact residual. Verified derivative, inhabitation, and
+nullability operations justify each baseline transfer, sequencing, and bulk
+completion. `copying_residual_typestate.v` extends both directions to inherited
+assignment expressions while reusing the ordinary expression rules. The converse starts from related environments; it does not claim
+that every arbitrary expression is a residual of a fixed class protocol.
 
 For the optional mode, `check_program_with_copy` takes a Boolean mode per class.
 An enabled class must satisfy `residual_shuffle_closed`, which quantifies over
@@ -272,15 +317,20 @@ guards. The monitored semantics adds those guards and explicit error outcomes;
 its error-freedom and equivalence theorems follow from the raw results.
 Class correctness is preserved by the invariant. Uninitialized field loads
 have no transition, so the theorem concerns all executable prefixes and
-completed executions. It does not claim initialization progress. A separate
-ordinary initialization discipline is the assumption made in the draft.
+completed executions. It does not claim initialization progress. The paper
+assumes ordinary typing and scope correctness and likewise gives undefined
+accesses no reduction.
 
-The calculus has allocation, copy, fields, atomic event calls, finish,
-sequencing, and nondeterministic branch choice. It excludes method bodies,
-loops, exceptions, callbacks, and concurrency. The core has no verified parser
-or correspondence with a full-language implementation. The regular-seed bridge
+The calculus has allocation, copy, fields, atomic event calls, terminal `Skip`,
+sequencing, and one instrumented bulk `Finish`. It excludes conditionals,
+Boolean expressions, loops, method bodies, exceptions, callbacks, and concurrency.
+The core has no verified parser or correspondence with a full-language implementation. The regular-seed bridge
 inherits the existing finite alphabet and a chosen default symbol in the pumping
 relation. The generic client soundness proof has no finite-alphabet assumption.
+All classes share the event carrier `A`. Per-class alphabets are interpreted
+through their protocol languages; if complete words use only a class's events,
+viability excludes an appended event outside that alphabet. A separate
+class-table frontend is outside the artifact.
 
 The implementation is executable but favors simple verified constructions.
 Shuffle enumeration and finite normalization can be large. DFA viability is
@@ -296,8 +346,9 @@ the rest of this project. Choose and add the project license before public
 release. The opam metadata deliberately leaves that field unset.
 An archival artifact URL/DOI also remains to be supplied.
 
-The claim map records surface-to-core correspondence obligations and other
-explicit scope boundaries. The baseline necessity result is mechanized for
+The claim map records the proved source instrumentation, baseline residual
+representations in both modes, and ghost/surface correspondences, alongside the remaining
+scope boundaries. The baseline necessity result is mechanized for
 the core checker. These remaining boundaries are
 not failed proofs or admitted theorems. No container image or fresh
 operating-system dependency installation has been validated. The source

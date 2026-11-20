@@ -1,4 +1,4 @@
-# Pumping protocols and alias-oblivious typestate
+# Foundations for Typestate Checking without Alias Analysis
 
 This development proves the regular-seed construction, exact shuffle-closure
 certification, and the draft's per-reference typestate safety and completion
@@ -9,8 +9,9 @@ also shuffle closed, with a separate verified certificate and soundness proof.
 An explicit semantic bridge relates these closure conditions to the
 first-error subsequence property of Kellogg et al.'s *Accumulation Analysis*.
 Parameterized protocol families cover persistent prerequisites, count
-thresholds, and reusable capacity. Their executable queries, certificates,
-concrete seed languages, and aliasing clients are verified in the same core.
+thresholds, and reusable capacity. Concrete ordered-milestone and independent-service
+protocols add distinct persistent structures. Their executable queries, certificates,
+exact seed languages, and aliasing clients are verified in the same core.
 
 Start with the [claim-to-theorem map](CLAIM_THEOREM_MAP.md) for current paper
 claims, exact theorem signatures, hypotheses, and remaining gaps. The
@@ -86,6 +87,7 @@ certification and typestate results do not depend on that argument.
 | Coverage | `coverage.v`: executable block recognizer and equivalence to the singleton regex. `coverage_simulation.v`: the singleton automaton's reachable-state simulation, equivalence to that recognizer, and an at-most-`length(seed)+1` state bound. |
 | Finite certification | `finite_shuffles.v`: complete shuffle enumeration. `certification.v`: Boolean seed/regex certification iff shuffle closedness, and checked rejection witnesses. |
 | Decidable protocols | `protocols.v`: verified completion/viability interface. `regular_protocols.v`: explicit closure regex and an implementation using normalized-seed coverage for membership and DFA residual inhabitation for viability. |
+| Exact protocol inputs | `exact_protocols.v`: DFA and regex adapters that preserve the supplied language, exact shuffle certification, and client completion soundness. `exact_protocol_examples.v`: the unchanged last-build protocol, accepted/rejected clients, and its distinction from pumping seeds. |
 | Programming language | `syntax.v`: direct statements, finite maps, evaluation contexts, the finish-free source fragment, and single-exit instrumentation. `semantics.v`: unguarded primitive updates, configuration steps, finite execution, and the source/instrumented execution equivalence. `surface_semantics.v`: bidirectional ghost/surface simulation with arbitrary fresh locations, extensional observations, and all-object property transfer. |
 | Runtime protocol checks | `monitor_shape.v`: raw references and heap targets denote allocated locations. `runtime_monitor.v`: explicit protocol-error outcomes, object-history call checks, allocation viability, a single all-object completion guard at bulk `Finish`, contextual errors, and raw/monitored prefix and final equivalence for accepted baseline and copying programs. `surface_monitor.v`: independent guarded surface rules, guard correspondence, successful/error execution simulations, and surface safety, completion, necessity, and monitor equivalence. |
 | Typestate system | `typestate.v`: one class/history environment, structural statement typing/checking, current-binding bulk completion, and checker equivalence. `residual_typestate.v` and `copying_residual_typestate.v`: baseline and optional history/regex representation, primitive and structural transfer, and program acceptance correspondence. `residual_invariants.v`: reachable residual expression environments, binding agreement, viable views, and retired completion. |
@@ -94,6 +96,7 @@ certification and typestate results do not depend on that argument.
 | Accumulation relationship | `accumulation_bridge.v`: first-error subsequence law, exact safety/residual-shuffle correspondence, and sufficient completion contract. `accumulation_integration.v`: observation interpretation, existing finite certificates, and client-soundness consequences. `accumulation_examples.v`: an inhabited contract and separating examples. `kellogg_separation.v`: the first-error separation and a concrete unsafe client when copying lacks its certificate. |
 | Persistent machines | `monotone_protocols.v`: guarded runs, shuffle-closed derivatives, and safe repeat insertion. `monotone_pumping.v`: pumping closure. `monotone_regular.v`: finite DFA/regex representation and both certificates. |
 | Prerequisite and threshold families | `prerequisite_patterns.v` and `prerequisite_examples.v`: monotone prerequisite predicates, all-of/any-of instances, exact displayed seed languages, and checked inherited aliases. `threshold_patterns.v` and `threshold_examples.v`: arbitrary thresholds, exact queries, saturated finite states, exact seeds including threshold zero, and checked aliases in both modes. |
+| Ordered milestones and independent services | `persistent_pattern_queries.v`: exact executable queries, regularity, closure, accumulation laws, and checker soundness for finite monotone machines with a completing suffix. `milestone_service_patterns.v`: two concrete machines. `milestone_service_seeds.v`: exact displayed seeds. `milestone_service_examples.v`: checked clients and an explicit aliasing execution. |
 | Reusable capacity | `capacity_patterns.v`: the prefix budget invariant over finite resource identities, basic certification, regularity, separation from residual closure and accumulation, and checked clients. `capacity_seed_table.v` and `capacity_seed_patterns.v`: checked exact correspondence with the displayed two-name six-seed language. `pattern_seed_automata.v`: generic frontier and DFA simulation lemmas. |
 | Verification | `examples.v`, `certification_examples.v`, `copying_examples.v`, `residual_certification_examples.v`, `accumulation_examples.v`, `runtime_monitor_examples.v`, `audit.v`, and `check_sources.py`. |
 
@@ -173,6 +176,52 @@ another continues, and successful baseline and inherited-history executions.
 `noncanonical_surface_execution` and `noncanonical_surface_equipped` allocate
 locations 37 and 5 and reconstruct a matching ghost execution. Both objects
 remain observable after bulk exit removes their references.
+
+### Enforcing an exact protocol instead of pumping seeds
+
+`regular_family` interprets its regular expressions as seeds and recognizes
+their pumping closures; `check_regular_program` combines their certification
+with client checking. To enforce a supplied language unchanged, use
+`exact_dfa_family` or `exact_regex_family` from
+[exact_protocols.v](exact_protocols.v), followed by `check_program`.
+The adapter theorems prove exact acceptance and viability queries. Client
+soundness additionally requires `certified` for that family: client acceptance
+alone does not certify a protocol. `certify_exact_dfa` and
+`certify_exact_regex` provide exact closure decisions for these inputs.
+
+[exact_protocol_examples.v](exact_protocol_examples.v) gives a four-state DFA
+for `K_last = u {u,b}* b`, with `false` encoding `u` and `true` encoding `b`.
+The exact checker accepts the completed history `ubub` and rejects a client
+ending at `ubu`. The latter prefix remains viable: one more `b` completes it.
+In contrast, the pumping closure of seed `ub` already accepts `ubu` as complete.
+The executable example uses transparent queries to avoid RegLang's locked
+finite-set representation. `k_last_exact_dfa_queries` proves that both queries
+equal those of `exact_dfa_family` for every class and word.
+Run this walkthrough from the package root after building:
+
+```sh
+coqtop -quiet -Q proof Accumulation -Q proof/RegLang RegLang <<'ROCQ'
+From mathcomp Require Import all_ssreflect.
+From Accumulation Require Import protocols typestate exact_protocols exact_protocol_examples.
+Eval vm_compute in accepts k_last_family 0 [::false;true;false;true].
+Eval vm_compute in accepts k_last_family 0 [::false;true;false].
+Eval vm_compute in viable k_last_family 0 [::false;true;false].
+Eval vm_compute in check_program k_last_family k_last_fields k_last_complete_client.
+Eval vm_compute in check_program k_last_family k_last_fields k_last_incomplete_client.
+Eval vm_compute in accepts ub_seed_family 0 [::false;true;false].
+Check k_last_exact_dfa_queries.
+Check k_last_exact_certificate.
+Check k_last_complete_client_terminates.
+Check k_last_client_completion_sound.
+ROCQ
+```
+
+The six evaluations return `true`, `false`, `true`, `true`, `false`, `true`.
+`k_last_dfa_language` proves the language equation for every word, and
+`k_last_shuffle_closed` proves closure structurally. `k_last_exact_certificate`
+then follows from the certificate's specification. This walkthrough evaluates
+the exact language and client queries; it does not benchmark the reference
+certificate's bounded-word enumeration over the product automaton.
 
 ### Runtime checks and the program boundary
 
@@ -260,10 +309,11 @@ global context.
 
 ## Verified protocol patterns
 
-The families in the paper's [protocol-pattern section](../paper/protocol-patterns.tex)
+The families in the paper's [protocol-pattern section](../paper/discussion.tex)
 instantiate the existing `protocol_family` interface. Their Boolean viability
-queries mean exactly that some completing suffix exists. Completion requires
-at least one designated use, which is an obligation of the modeled client.
+queries mean exactly that some completing suffix exists. Completion is a client
+policy: the new examples require the final ordered milestone or both independent
+queries; the prerequisite, threshold, and capacity models require a designated use.
 
 The `monotone_machine` interface in [monotone_protocols.v](monotone_protocols.v)
 requires upward-closed guards and acceptance, monotone enabled transitions,
@@ -278,12 +328,27 @@ equality, and `finite_machine_seed_certificate` and
 
 | Family | Definitions and main guarantees |
 | --- | --- |
+| Ordered milestones | [milestone_service_patterns.v](milestone_service_patterns.v): `milestone_family` permits the first `i` only after `t` and the first `r` only after `i`; earlier events remain enabled. Completion requires `r`. `milestone_copying_certified`, `milestone_pumping`, and `milestone_accumulation_contract` prove both checking modes, pumping closure, and accumulation safety with stable completion. |
+| Independent services | [milestone_service_patterns.v](milestone_service_patterns.v): `service_family` requires `t` before `w` and `c` before `q`, with both queries required for completion. `service_copying_certified`, `service_pumping`, and `service_accumulation_contract` prove the same properties. Each service may be used before the other is configured. |
 | Persistent prerequisites | [prerequisite_patterns.v](prerequisite_patterns.v): `prerequisite_spec` packages a satisfiable monotone Boolean predicate on a finite feature set. `all_prerequisites` and `any_prerequisites` instantiate it. `prerequisite_viable_spec`, `prerequisite_protocol_copying_certified`, `prerequisite_language_regular`, and `prerequisite_regular_family_exact` connect queries, both modes, and regular seeds. |
 | Count thresholds | [threshold_patterns.v](threshold_patterns.v): `threshold_family N` permits `Use` only after at least `N` increments and permits subsequent increments and uses. `threshold_queries`, `threshold_language_shape`, and `threshold_copying_certified` characterize queries and both modes for every natural `N`. [threshold_examples.v](threshold_examples.v): `threshold_finite_language`, `threshold_regular`, and `threshold_regular_family_exact` justify the saturated finite-state representation. |
 | Reusable capacity | [capacity_patterns.v](capacity_patterns.v): `capacity_safeP` equates the executable check with the requirement that every prefix uses at most as many distinct identities as it has capacity additions. `capacity_viable_spec`, `capacity_certified`, and `capacity_regular` give exact viability, basic certification, and regularity. With two distinct identities, `capacity_not_residual` and `capacity_certified_not_kellogg` prove the stronger conditions fail. |
 
+The manuscript abbreviates ordered events `t,i,r` as `a,b,c` and service
+events `t,w,c,q` as `a,b,c,d`. These are changes of event names: the
+source seeds and theorems below retain their mnemonic names.
+
+The ordered-milestone and independent-service results are concrete three- and
+four-event instances. Their common wrapper, [persistent_pattern_queries.v](persistent_pattern_queries.v),
+provides generic exact queries and soundness from a finite monotone machine and
+a suffix that completes every state. Both new patterns satisfy the extracted
+accumulation contract; reusable capacity supplies the separation from that law.
+
 The pumping closures of the concrete seeds equal the **whole** modeled
-languages. In [prerequisite_examples.v](prerequisite_examples.v),
+languages. In [milestone_service_seeds.v](milestone_service_seeds.v),
+`milestone_displayed_seeds_exact` covers `{tir}`, and
+`service_displayed_seeds_exact` covers `{twcq,tcwq,tcqw,ctwq,ctqw,cqtw}`.
+In [prerequisite_examples.v](prerequisite_examples.v),
 `builder_displayed_seeds_exact` covers `{abu,bau}` and
 `alternative_displayed_seeds_exact` covers `{au,bu,abu,aub,bau,bua}`.
 These Boolean equalities connect to pumping closure through `coveredb_spec`.
@@ -294,6 +359,12 @@ In [capacity_seed_patterns.v](capacity_seed_patterns.v),
 `capacity_six_seeds_exact` covers `{ab,ac,aabc,abac,aacb,acab}` for two identities.
 The letters in these displays follow the paper; the modules use their stated
 Boolean or option encodings.
+
+[milestone_service_examples.v](milestone_service_examples.v) checks the ordered
+client and an out-of-order rejection. Its inherited service client has local
+histories `twcq` and actual object history `twwccqq`; the module proves checker
+acceptance, rejection without inheritance, a terminating execution, and
+`service_alias_completion`. A client using only the first service is incomplete.
 
 The family modules also check clients and failures. The builder and threshold
 examples accept inherited aliases, reject the corresponding client without
@@ -319,12 +390,20 @@ python3 generate_capacity_frontier.py > /tmp/capacity_seed_table.v
 diff -u capacity_seed_table.v /tmp/capacity_seed_table.v
 ```
 
-The Python generator is untrusted. Rocq checks the table's initial frontier,
-every transition, acceptance, and simulation into the semantic capacity DFA.
+The new frontier tables can likewise be reproduced without overwriting sources:
+
+```sh
+python3 generate_milestone_service_frontiers.py > /tmp/milestone_service_seed_tables.v
+diff -u milestone_service_seed_tables.v /tmp/milestone_service_seed_tables.v
+```
+
+The Python generators are untrusted. Rocq checks each table's initial frontier,
+every transition, acceptance, and simulation into the corresponding semantic DFA.
 The exact-language proof therefore covers arbitrary words. The paper's
-AutoValue, Commons CLI, and append-only `ArrayList` fragments motivate event
-interpretations; the artifact does not verify those Java implementations or a
-translation from Java into the core calculus.
+SQLite schema operations and the selected `ImageWriteParam` fragment motivate
+the two new event interpretations. Earlier AutoValue, Commons CLI, and append-only
+`ArrayList` examples remain supported by the artifact. These results do not
+verify the library implementations or translations into the core calculus.
 
 ## Semantic choices and scope
 

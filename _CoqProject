@@ -61,4 +61,11 @@ threshold_examples.v
 capacity_patterns.v
 capacity_seed_table.v
 capacity_seed_patterns.v
+persistent_pattern_queries.v
+milestone_service_patterns.v
+milestone_service_seed_tables.v
+milestone_service_seeds.v
+milestone_service_examples.v
+exact_protocols.v
+exact_protocol_examples.v
 audit.v

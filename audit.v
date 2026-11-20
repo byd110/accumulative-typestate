@@ -271,3 +271,57 @@ Print Assumptions capacity_alias_client_terminates.
 Print Assumptions capacity_alias_actual_history.
 Print Assumptions capacity_alias_actual_history_complete.
 Print Assumptions capacity_separating_family_exact.
+
+(* Ordered milestones and independent services: concrete positive patterns. *)
+From Accumulation Require Import persistent_pattern_queries
+  milestone_service_patterns milestone_service_seeds milestone_service_examples.
+Print Assumptions persistent_viable_spec.
+Print Assumptions persistent_language_regular.
+Print Assumptions persistent_accumulation_contract.
+Print Assumptions persistent_checked_prefix.
+Print Assumptions persistent_checked_completion.
+Print Assumptions milestone_copying_certified.
+Print Assumptions milestone_pumping.
+Print Assumptions milestone_accumulation_contract.
+Print Assumptions milestone_displayed_seeds_exact.
+Print Assumptions milestone_client_accepted.
+Print Assumptions milestone_out_of_order_rejected.
+Print Assumptions service_copying_certified.
+Print Assumptions service_pumping.
+Print Assumptions service_accumulation_contract.
+Print Assumptions service_displayed_seeds_exact.
+Print Assumptions service_alias_client_accepted.
+Print Assumptions service_alias_client_needs_inheritance.
+Print Assumptions service_both_queries_required.
+Print Assumptions service_alias_terminates.
+Print Assumptions service_alias_object_history.
+Print Assumptions service_alias_completion.
+
+(* Exact-language inputs and the last-build completion policy. *)
+From Accumulation Require Import exact_protocols exact_protocol_examples.
+Print Assumptions exact_dfa_family_language.
+Print Assumptions exact_dfa_family_viable.
+Print Assumptions certify_exact_dfa_spec.
+Print Assumptions exact_dfa_family_certified.
+Print Assumptions exact_regex_family_language.
+Print Assumptions exact_regex_family_viable.
+Print Assumptions certify_exact_regex_spec.
+Print Assumptions exact_regex_family_certified.
+Print Assumptions exact_dfa_program_completion_sound.
+Print Assumptions k_last_dfa_language.
+Print Assumptions k_last_exact_dfa_queries.
+Print Assumptions k_last_exact_language.
+Print Assumptions k_last_shuffle_closed.
+Print Assumptions k_last_exact_certificate.
+Print Assumptions k_last_certified.
+Print Assumptions k_last_ubub_complete.
+Print Assumptions k_last_ubu_incomplete.
+Print Assumptions k_last_ubu_viable.
+Print Assumptions k_last_complete_client_accepted.
+Print Assumptions k_last_incomplete_client_rejected.
+Print Assumptions k_last_complete_client_terminates.
+Print Assumptions k_last_complete_actual_history.
+Print Assumptions k_last_client_completion_sound.
+Print Assumptions ub_seed_accepts_ubu.
+Print Assumptions ubu_in_pumping_closure.
+Print Assumptions k_last_not_pumping_closed.

@@ -34,6 +34,9 @@ nlia.cache
 nra.cache
 native_compute_profile_*.data
 
+*.py
+!generate_milestone_service_frontiers.py
+
 # generated timing files
 *.timing.diff
 *.v.after-timing

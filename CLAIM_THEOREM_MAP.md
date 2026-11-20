@@ -33,8 +33,9 @@ Read the classifications as follows:
 - **SOURCE/BUILD FACT:** a reproducible statement about files or tool output,
   rather than a mathematical theorem.
 
-All formal signatures linked below are reproduced verbatim in the declaration
-index. Section parameters are generalized theorem parameters, not extra axioms.
+The declaration index reproduces the indexed signatures verbatim. The
+protocol-pattern table links directly to its definitions and theorem sources.
+Section parameters are generalized theorem parameters, not extra axioms.
 LaTeX labels identify paper results independently of their printed numbering.
 
 ## Claim extraction and traceability
@@ -80,7 +81,7 @@ line numbers. The first table's paraphrases are not verbatim quotations.
 | A4 [Abstract](../paper/abstract.tex) | Regular expressions describe representative histories from which candidate protocols are constructed. A decision procedure certifies shuffle closedness or returns a counterexample. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`closure_regex_correct`](#declaration-closure-regex-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_none`](#declaration-regex-counterexample-none), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | Finite regular-expression input, finite inhabited alphabet for the pumping relation. Total Rocq definitions give termination. No practical runtime bound is claimed. |
 | A5 [Abstract](../paper/abstract.tex) | The paper connects its condition to accumulation analysis and gives a supported protocol whose safe histories violate the accumulation condition. | [`kellogg_error_closed_iff_residual_prefix_shuffle_closed`](#declaration-kellogg-error-closed-iff-residual-prefix-shuffle-closed), [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`separating_certified_not_kellogg`](#declaration-separating-certified-not-kellogg) | PROVEN, scoped | The bridge extracts a first-error trace law and interprets non-error as extendibility to completion. It does not formalize the other analysis or compare accepted client programs. |
 | A6 [Abstract](../paper/abstract.tex) | For accepted programs, execution remains safe and every allocated object’s history is accepted at termination. | [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN, scoped | Accepted source programs, with a single automatically instrumented bulk exit. Completed execution is a premise. Initialization progress and termination are not conclusions. |
-| A7 [Abstract](../paper/abstract.tex) | The Rocq development verifies the language constructions, certification procedures, and core checker soundness without additional axioms. | [audit.v](audit.v), `coqwc *.v`, [build instructions](README.md) | PROVEN for audited results / SOURCE/BUILD FACT for size | The line count is a reproducible size report, not a theorem. Principal theorem assumption reports establish the no-additional-axioms claim. Optional minimal-corpus results use classical logic. |
+| A7 [Abstract](../paper/abstract.tex) | The Rocq development verifies the language constructions, certification procedures, and core checker soundness without additional axioms. | [audit.v](audit.v), [build instructions](README.md) | PROVEN for audited results | Principal theorem assumption reports establish the no-additional-axioms claim. Optional minimal-corpus results use classical logic. |
 | I1 [Introduction, `sec:intro`](../paper/introduction.tex) | The sequential checker tracks each binding’s local history. Baseline assignment starts a fresh history, calls update only the receiver and require viability, and each binding must complete before it is discarded or the program exits. | [`check_step_sound`](#declaration-check-step-sound), [`check_step_complete`](#declaration-check-step-complete), [`check_stmt_spec`](#declaration-check-stmt-spec) | PROVEN | See the primitive-rule comparison below. Completion of a single alias does not discharge other bindings. |
 | I2 [Introduction, `sec:intro`](../paper/introduction.tex) | For any nonempty regular shuffle-closed protocol, accepted programs are safe at every execution prefix, and all allocated objects have complete histories at termination, including unreachable objects. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound) | PROVEN, scoped | The quantified locations satisfy l < next_loc m, with no reachability restriction. |
 | I3 [Introduction, `sec:intro`](../paper/introduction.tex) | Shuffle closedness is necessary for the stated discipline, which accepts every locally valid history. | [`completion_sound_requires_certified`](#declaration-completion-sound-requires-certified) | PROVEN, scoped | The converse constructs a baseline two-binding client for arbitrary complete histories and their chosen interleaving. It concerns this fixed checker, not every checker without alias information. |
@@ -94,7 +95,7 @@ line numbers. The first table's paraphrases are not verbatim quotations.
 | M1 [Mechanization, `sec:mechanization`](../paper/mechanization.tex) | The development verifies language constructions, finite certificates and rejection witnesses, the accumulation bridge, and both checker modes, connecting successful certification and checking to safety and completion. | [`pumping_normalize_correct`](#declaration-pumping-normalize-correct), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound), [`accumulation_contract_residual_shuffle_closed`](#declaration-accumulation-contract-residual-shuffle-closed), [`regular_program_prefix_sound`](#declaration-regular-program-prefix-sound), [`regular_program_completion_sound`](#declaration-regular-program-completion-sound), [`copying_regular_program_prefix_sound`](#declaration-copying-regular-program-prefix-sound), [`copying_regular_program_completion_sound`](#declaration-copying-regular-program-completion-sound) | PROVEN, scoped | Regular-seed certification discharges the protocol premises for the fixed core checkers. Initialization progress and termination remain outside the guarantees. |
 | M2 [Mechanization, `sec:mechanization`](../paper/mechanization.tex) | The executable checkers agree with the declarative rules and have proved correspondences to regular-expression qualifiers and surface semantics. | [`check_stmt_spec`](#declaration-check-stmt-spec), [`copy_step_spec`](#declaration-copy-step-spec), [`regular_residual_program_correspondence`](#declaration-regular-residual-program-correspondence), [`copying_regular_residual_program_correspondence`](#declaration-copying-regular-residual-program-correspondence), [`ghost_surface_execution`](#declaration-ghost-surface-execution), [`surface_ghost_execution`](#declaration-surface-ghost-execution) | PROVEN, scoped | Expression correspondences use related environments and a correct initial expression per class. Ghost/surface simulation uses an injective location renaming and extensional map observations. |
 | M3 [Mechanization, `sec:mechanization`](../paper/mechanization.tex), formerly I11 | The principal construction, certification, and client-soundness theorems require no additional axioms. | [audit.v](audit.v), [assumption-audit instructions](README.md) | PROVEN for audited results | See the trust boundary below. Generalized protocol/certification hypotheses remain explicit inputs. Optional minimal-corpus results use classical logic and are outside the audited dependency closure. |
-| M4 [Mechanization, `sec:mechanization`](../paper/mechanization.tex), formerly part of I12 | The development builds on Mathematical Components and RegLang. | [dependency and build instructions](README.md), [artifact guide](../paper/ARTIFACT_README.md) | SOURCE/BUILD FACT | RegLang is bundled. The former introductory size claim remains in the abstract (A7) and artifact guide: the documented count is 8,033 project definition/proof lines across 37 sources, excluding the 12 bundled RegLang sources. Size is not a mathematical theorem or a claim in the new Mechanization section. |
+| M4 [Mechanization, `sec:mechanization`](../paper/mechanization.tex), formerly part of I12 | The development builds on Mathematical Components and RegLang. | [dependency and build instructions](README.md), [artifact guide](../paper/ARTIFACT_README.md) | SOURCE/BUILD FACT | RegLang is bundled. [_CoqProject](_CoqProject) lists sources and [audit.v](audit.v) lists audited declarations. `coqwc *.v` reproduces the current project definition/proof line count, excluding comments and bundled RegLang. Size is not a mathematical theorem. |
 | C1 [Conclusion, `sec:conclusion`](../paper/body.tex) | Candidate protocols are constructed from representative seed specifications and certified by a finite procedure with counterexamples on failure. | [`pumping_closure_regular_regex`](#declaration-pumping-closure-regular-regex), [`certify_regex_spec`](#declaration-certify-regex-spec), [`regex_counterexample_complete`](#declaration-regex-counterexample-complete), [`regex_counterexample_sound`](#declaration-regex-counterexample-sound) | PROVEN | Same regular-language and alphabet scope as A4. Certification, rather than construction alone, establishes shuffle closure. |
 | C2 [Conclusion, `sec:conclusion`](../paper/body.tex) | Permitted complete histories must remain permitted when interleaved for the fresh-history discipline to check shared objects reference by reference. Accepted programs preserve viable object histories throughout execution and complete them at normal termination. | [`typestate_prefix_sound`](#declaration-typestate-prefix-sound), [`typestate_completion_sound`](#declaration-typestate-completion-sound), [`completion_sound_iff_certified`](#declaration-completion-sound-iff-certified), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | PROVEN for the core | The necessary-and-sufficient condition concerns the fixed fresh-history checker and raw all-object completion soundness. Both modes have the stated prefix and final guarantees under their respective certificates; completed execution remains a premise. |
 | C3 [Conclusion, `sec:conclusion`](../paper/body.tex) | Stronger protocol conditions allow progress to be inherited at assignment. | [`certify_residuals_spec`](#declaration-certify-residuals-spec), [`copying_program_prefix_sound`](#declaration-copying-program-prefix-sound), [`copying_program_completion_sound`](#declaration-copying-program-completion-sound) | PROVEN | Every reachable derivative must be shuffle closed. The certificate includes the initial derivative; empty derivatives satisfy closure vacuously. Allocation and field loads remain fresh. |
@@ -138,6 +139,64 @@ through `copying_table_sound`, the certificate required by
 accumulation premises. The `cor:certified-typestate` and copying/Kellogg rows
 use these compositions for their monitored conclusions; no additional
 specialized monitor theorem is claimed.
+
+### Protocol-pattern families
+
+This section links the examples in [Protocol patterns (`sec:protocol-patterns`)](../paper/discussion.tex)
+to the general family theory retained in the artifact. The paper presents names,
+code illustrations, and concrete protocols; the artifact also covers arbitrary
+thresholds, monotone prerequisite predicates, and finite sets of capacity names.
+The source links below identify the definitions and proofs directly; they do
+not add reconstructed signatures to the verbatim declaration index.
+
+The manuscript abbreviates ordered events `t,i,r` as `a,b,c` and service
+events `t,w,c,q` as `a,b,c,d`. These are changes of event names: the
+source seeds and theorems below retain their mnemonic names.
+
+| Claim | Source declarations | Verdict and boundary |
+| --- | --- | --- |
+| Artifact support: guarded monotone, inflationary state updates with upward-closed acceptance give pumping closure and shuffle-closed derivatives. | [monotone_protocols.v](monotone_protocols.v): `monotone_machine`, `machine_run`, `machine_language`, `machine_language_residual_shuffle_closed`, `machine_language_repeat`; [monotone_pumping.v](monotone_pumping.v): `machine_language_pumping` | PROVEN. Enabled events remain enabled at larger states, and an accepted continuation can be replayed from a larger state. Generic shuffle/repetition results do not require finite state spaces. |
+| A finite persistent machine has an exact regular seed representation and passes both certificates. | [monotone_regular.v](monotone_regular.v): `machine_dfa_language`, `finite_machine_language_regular`, `finite_machine_regular_family_language`, `finite_machine_seed_certificate`, `finite_machine_copying_certificate` | PROVEN for finite alphabets and states with Boolean guard/acceptance queries and their specifications. The pumping representation additionally takes a default event. Disabled transitions enter a rejecting sink. |
+| Ordered milestones require first occurrences `t`, `i`, `r` in order, and later occurrences preserve established permissions. | [milestone_service_patterns.v](milestone_service_patterns.v): `milestone_family`, `milestone_copying_certified`, `milestone_pumping`, `milestone_accumulation_contract`; [milestone_service_seeds.v](milestone_service_seeds.v): `milestone_displayed_seeds_exact` | PROVEN for the concrete three-event instance and all words. The language is exactly `PC({tir})`; completion requires `r`. Both assignment modes and the extracted accumulation contract hold. This is not a parameterized theorem for arbitrary dependency graphs. |
+| Independent services require `t` before `w` and `c` before `q`, and both queries for completion. | [milestone_service_patterns.v](milestone_service_patterns.v): `service_family`, `service_copying_certified`, `service_pumping`, `service_accumulation_contract`; [milestone_service_seeds.v](milestone_service_seeds.v): `service_displayed_seeds_exact` | PROVEN for the concrete four-event instance and all words. The language is exactly `PC({twcq,tcwq,tcqw,ctwq,ctqw,cqtw})`. Its residuals are shuffle closed and it satisfies accumulation; it does not establish a separation from accumulation. |
+| A finite monotone machine with a common completing suffix supplies exact executable queries and checker guarantees. | [persistent_pattern_queries.v](persistent_pattern_queries.v): `persistent_viable_spec`, `persistent_language_regular`, `persistent_copying_certified`, `persistent_pumping`, `persistent_accumulation_contract`, `persistent_checked_prefix`, `persistent_checked_completion` | PROVEN under Boolean guard/acceptance specifications and a suffix that completes every machine state. The two concrete machines discharge these hypotheses constructively. |
+| The ordered client checks successfully; an inherited service client completes the actual object history. | [milestone_service_examples.v](milestone_service_examples.v): `milestone_client_accepted`, `milestone_out_of_order_rejected`, `service_alias_client_accepted`, `service_alias_client_needs_inheritance`, `service_both_queries_required`, `service_alias_terminates`, `service_alias_object_history`, `service_alias_completion` | PROVEN for explicit core clients. Both service aliases have local histories `twcq`; their shared object records `twwccqq`. The same client without inheritance is rejected, and using only one service does not complete the protocol. |
+| Persistent prerequisites cover any satisfiable monotone Boolean predicate on a finite set of established features. | [prerequisite_patterns.v](prerequisite_patterns.v): `prerequisite_spec`, `prerequisite_protocol`, `prerequisite_viable_spec`, `prerequisite_protocol_copying_certified`, `prerequisite_language_regular`, `prerequisite_regular_family_exact` | PROVEN. `prerequisite_spec` includes a satisfying witness. A setter establishes one feature; a use checks the predicate and records completion. At least one use is required. |
+| All-of and any-of prerequisites are instances; their two-feature languages equal the pumping closures of the example seeds. | [prerequisite_patterns.v](prerequisite_patterns.v): `all_prerequisites`, `any_prerequisites`; [prerequisite_examples.v](prerequisite_examples.v): `builder_displayed_seeds_exact`, `alternative_displayed_seeds_exact`; [certification.v](certification.v): `coveredb_spec` | PROVEN. The example seeds are `{abu,bau}` and `{au,bu,abu,aub,bau,bua}` respectively. The exact theorems equate coverage and protocol acceptance for every word; `coveredb_spec` converts coverage to pumping closure. The any-of required set must be nonempty. |
+| An inherited builder client is accepted and completes its actual object history; completing one alias does not discharge another. | [prerequisite_examples.v](prerequisite_examples.v): `builder_alias_client_accepted`, `builder_alias_client_needs_inheritance`, `builder_source_obligation_remains`, `builder_alias_terminates`, `builder_alias_object_history`, `builder_alias_completion` | PROVEN for the explicit core client. Its local inherited histories share the first setter, while its actual history contains that event once. The module checks acceptance, rejection controls, a terminating execution, and the object history. |
+| Count-threshold protocols require at least `N` increments before every use and at least one use for completion, for arbitrary natural `N`. | [threshold_patterns.v](threshold_patterns.v): `threshold_family`, `threshold_queries`, `threshold_language_shape`, `threshold_copying_certified`, `threshold_post_use_operations_accepted`; [threshold_examples.v](threshold_examples.v): `threshold_finite_language`, `threshold_regular`, `threshold_regular_family_exact` | PROVEN. The finite representation saturates the counter at `N`; repeats and further increments remain permitted after a use. Threshold zero is included. |
+| The positive-threshold language is exactly `PC({a^N u})`; threshold zero is exactly `PC({u,au,ua})`. | [threshold_examples.v](threshold_examples.v): `threshold_singleton_seed_exact`, `threshold_zero_seeds_exact` | PROVEN for arbitrary words. The singleton equality requires `N > 0`; the separate zero-threshold corpus admits increments before or after a use. |
+| Threshold checking distinguishes counts with the same event set and supports aliasing clients in both modes. | [threshold_patterns.v](threshold_patterns.v): `threshold_counts_not_sets`, `threshold_aliases_accepted`, `threshold_inherited_aliases_accepted`, `threshold_inherited_aliases_need_inheritance`, `threshold_inherited_aliases_terminate`, `threshold_inherited_object_history`, `threshold_aliases_sound`, `threshold_inherited_aliases_sound` | PROVEN. At threshold two, one increment and two increments have different next-use permissions. The inherited client has an explicit terminating execution and exact object history. |
+| Reusable capacity requires every prefix to use no more distinct identities than its capacity additions and requires at least one use for completion. | [capacity_patterns.v](capacity_patterns.v): `capacity_safeP`, `capacity_complete`, `capacity_viable_spec`, `capacity_certified`, `capacity_regular` | PROVEN over a finite identity type. The executable family takes a default identity to witness completion. Repeated use of an existing identity needs no additional capacity; an invalid prefix cannot be repaired by later additions. |
+| The directly evaluable capacity queries implement the same semantic family. | [capacity_patterns.v](capacity_patterns.v): `capacity_scan_correct`, `capacity_safe_query_correct`, `capacity_complete_query_correct`, `capacity_executable_certified` | PROVEN for every word. A duplicate-free list represents occupied identities; its length equals the semantic set cardinality. The checked clients use these refined queries. |
+| Reusable capacity passes basic certification but fails residual closure and the extracted accumulation error law when two distinct identities exist. | [capacity_patterns.v](capacity_patterns.v): `capacity_not_residual`, `capacity_not_kellogg`, `capacity_certified_not_kellogg` | PROVEN under the explicit distinct-identity hypothesis. After one capacity addition, either identity can be used separately, but the two distinct uses cannot be composed without another addition. This is a protocol-language separation. |
+| For two identities, the capacity language is exactly the pumping closure of `{ab,ac,aabc,abac,aacb,acab}`. | [capacity_seed_patterns.v](capacity_seed_patterns.v): `capacity_six_seeds_exact`, `capacity_separating_family_exact`; [pattern_seed_automata.v](pattern_seed_automata.v): `finite_seed_automaton_correct`, `pattern_dfa_simulation_correct`; [capacity_seed_table.v](capacity_seed_table.v) | PROVEN for arbitrary words. Rocq checks every transition of the generated frontier table and its simulation into the independently defined capacity DFA. The generator is untrusted. |
+| Basic capacity clients preserve the prefix budget and complete every allocated object's history. | [capacity_patterns.v](capacity_patterns.v): `capacity_program_prefix_sound`, `capacity_program_completion_sound`, `capacity_alias_client_accepted`, `capacity_alias_client_terminates`, `capacity_alias_actual_history`, `capacity_overdraw_client_rejected`, `capacity_unfinished_alias_client_rejected`, `capacity_late_allocation_rejected` | PROVEN for checked core programs and existing executions. Explicit positive and negative clients rule out empty-language and final-count-only interpretations. |
+| SQLite schema operations, the selected `ImageWriteParam` fragment, and the earlier prerequisite/counting APIs illustrate the protocol patterns. | [Protocol-pattern API descriptions and citations](../paper/discussion.tex) | UNMECHANIZED API interpretation. The artifact verifies the event languages and core clients, not library bodies or a translation of SQL/Java programs into the calculus. The service example fixes explicit modes and valid settings; its two-query completion condition is a client policy. Ordinary parameter validity and the selected operation fragments remain part of the interpretation. |
+
+The [reproduction instructions](README.md#verified-protocol-patterns) show how
+to regenerate the capacity and milestone/service tables into `/tmp` and compare
+them with the checked sources. Each generator output is a candidate certificate; the transition and
+acceptance proofs establish its correctness.
+
+### Exact-language protocol inputs
+
+The discussion's claim that the system can enforce `K_last` unchanged is
+exercised by an exact-input route. These adapters take the protocol language
+itself; the regular-seed wrappers instead take its pumping closure. Client
+acceptance still requires a separately established shuffle-closure premise
+for soundness. The concrete certificate below is derived from a structural
+proof, rather than by running the product-automaton enumerator.
+
+| Claim or artifact interface | Exact declarations | Scope |
+| --- | --- | --- |
+| Exact DFA acceptance and viable prefixes | [`exact_dfa_family_language`](#declaration-exact-dfa-family-language), [`exact_dfa_family_viable`](#declaration-exact-dfa-family-viable) | PROVEN for the supplied DFA language, without pumping. |
+| Exact regex interpretation and shuffle certification | [`exact_regex_family_language`](#declaration-exact-regex-family-language), [`certify_exact_regex_spec`](#declaration-certify-exact-regex-spec) | PROVEN through the existing regex-to-DFA correctness theorem. |
+| Exact protocol certification implies client completion in that language | [`exact_dfa_program_completion_sound`](#declaration-exact-dfa-program-completion-sound) | PROVEN for accepted clients and completed executions, with a certificate for every class. |
+| `K_last = u {u,b}* b` is enforced unchanged | [`k_last_exact_language`](#declaration-k-last-exact-language), [`k_last_shuffle_closed`](#declaration-k-last-shuffle-closed), [`k_last_exact_certificate`](#declaration-k-last-exact-certificate) | PROVEN for all words; `false` encodes `u` and `true` encodes `b`. |
+| Executable example queries match the exact DFA adapter | [`k_last_exact_dfa_queries`](#declaration-k-last-exact-dfa-queries) | PROVEN acceptance and viability equality for every class and word; transparent queries avoid the library's locked finite-set representation. |
+| A completed `ubub` client is accepted and an `ubu` client is rejected | [`k_last_complete_client_accepted`](#declaration-k-last-complete-client-accepted), [`k_last_incomplete_client_rejected`](#declaration-k-last-incomplete-client-rejected), [`k_last_complete_client_terminates`](#declaration-k-last-complete-client-terminates), [`k_last_client_completion_sound`](#declaration-k-last-client-completion-sound) | PROVEN with an explicit terminating witness. `ubu` remains a viable prefix, but is not complete. |
+| Pumping the seed changes this completion policy | [`ub_seed_accepts_ubu`](#declaration-ub-seed-accepts-ubu), [`k_last_not_pumping_closed`](#declaration-k-last-not-pumping-closed) | PROVEN; distinguishes the two interfaces without changing either one's semantics. |
 
 ## Interfaces and supporting results from the artifact guide
 
@@ -225,6 +284,16 @@ explicit mathematical inputs. The regular integration proves certification
 from Boolean checks. The accumulation integration derives it from its stated
 semantic laws.
 
+The protocol-pattern families also discharge their hypotheses constructively.
+Prerequisite specifications carry a satisfying witness; threshold protocols
+accept a threshold-sized increment prefix followed by a use; capacity protocols
+accept an addition followed by a use of the supplied identity. The milestone and
+service machines constructively complete every state with `tir` and `twcq`,
+respectively. Their exact
+viability proofs and explicit aliasing executions are linked in the
+[protocol-pattern table](#protocol-pattern-families). The finite frontier tables
+are data checked by Rocq, so their Python generation adds no trusted proof step.
+
 The hypotheses are inhabited by kernel-checked positive clients in
 [examples.v](examples.v), [copying_examples.v](copying_examples.v), and
 [accumulation_examples.v](accumulation_examples.v), including allocation,
@@ -283,6 +352,9 @@ Read the following section contexts with those signatures:
 - `necessity.v`: `A : Type`, `P : protocol_family A`, and `FT` are
   quantified in the baseline converse. Its soundness premise quantifies over
   every statement, completed raw execution, and allocated location.
+- `exact_protocols.v`: `A : finType`; the exact adapters require no default
+  symbol and do not invoke pumping. `exact_protocol_examples.v` uses Boolean
+  events, with `u = false` and `b = true`.
 - `regular_soundness.v`: `A : finType`, `default : A`,
   `specifications : list (regexp A)`, and `FT`. Classes beyond the list use
   `Void`, so allocation of such a class cannot pass initial viability.
@@ -2464,4 +2536,187 @@ Theorem copying_regular_reachable_residual_configuration mode s m t :
   execution (initial_machine,instrument s) (m,t) ->
   exists G V, regex_copy_typed_stmt FT (fun c => closure_regex (spec c)) mode G t [] /\
     copying_residual_runtime_invariant (regular_family spec) FT m G V.
+```
+
+## Exact-protocol declaration index
+
+<a id="declaration-exact-dfa-family-language"></a>
+
+### `exact_dfa_family_language`
+
+Source: [exact_protocols.v:18](exact_protocols.v#L18).
+
+```coq
+Theorem exact_dfa_family_language spec c w :
+  protocol (exact_dfa_family spec) c w <-> (w \in dfa_lang (spec c)) = true.
+```
+
+<a id="declaration-exact-dfa-family-viable"></a>
+
+### `exact_dfa_family_viable`
+
+Source: [exact_protocols.v:22](exact_protocols.v#L22).
+
+```coq
+Theorem exact_dfa_family_viable spec c w :
+  viable (exact_dfa_family spec) c w = true <->
+  exists v, (w ++ v \in dfa_lang (spec c)) = true.
+```
+
+<a id="declaration-certify-exact-dfa-spec"></a>
+
+### `certify_exact_dfa_spec`
+
+Source: [exact_protocols.v:33](exact_protocols.v#L33).
+
+```coq
+Theorem certify_exact_dfa_spec D : certify_exact_dfa D = true <->
+  shuffle_closed (fun w => (w \in dfa_lang D) = true).
+```
+
+<a id="declaration-exact-regex-family-language"></a>
+
+### `exact_regex_family_language`
+
+Source: [exact_protocols.v:44](exact_protocols.v#L44).
+
+```coq
+Theorem exact_regex_family_language spec c w :
+  protocol (exact_regex_family spec) c w <-> (w \in spec c) = true.
+```
+
+<a id="declaration-certify-exact-regex-spec"></a>
+
+### `certify_exact_regex_spec`
+
+Source: [exact_protocols.v:61](exact_protocols.v#L61).
+
+```coq
+Theorem certify_exact_regex_spec r : certify_exact_regex r = true <->
+  shuffle_closed (fun w => (w \in r) = true).
+```
+
+<a id="declaration-exact-dfa-program-completion-sound"></a>
+
+### `exact_dfa_program_completion_sound`
+
+Source: [exact_protocols.v:78](exact_protocols.v#L78).
+
+```coq
+Theorem exact_dfa_program_completion_sound spec FT s m :
+  (forall c, certify_exact_dfa (spec c) = true) ->
+  check_program (exact_dfa_family spec) FT s = true ->
+  program_execution s initial_machine m ->
+  forall l, (l < next_loc m)%coq_nat ->
+  (object_history m l \in dfa_lang (spec (classes m l))) = true.
+```
+
+<a id="declaration-k-last-exact-dfa-queries"></a>
+
+### `k_last_exact_dfa_queries`
+
+Source: [exact_protocol_examples.v:142](exact_protocol_examples.v#L142).
+
+```coq
+Theorem k_last_exact_dfa_queries c w :
+  accepts k_last_family c w = accepts (exact_dfa_family (fun _ => k_last_dfa)) c w /\
+  viable k_last_family c w = viable (exact_dfa_family (fun _ => k_last_dfa)) c w.
+```
+
+<a id="declaration-k-last-exact-language"></a>
+
+### `k_last_exact_language`
+
+Source: [exact_protocol_examples.v:154](exact_protocol_examples.v#L154).
+
+```coq
+Theorem k_last_exact_language c w : protocol k_last_family c w <-> k_last w.
+```
+
+<a id="declaration-k-last-shuffle-closed"></a>
+
+### `k_last_shuffle_closed`
+
+Source: [exact_protocol_examples.v:92](exact_protocol_examples.v#L92).
+
+```coq
+Theorem k_last_shuffle_closed : shuffle_closed k_last.
+```
+
+<a id="declaration-k-last-exact-certificate"></a>
+
+### `k_last_exact_certificate`
+
+Source: [exact_protocol_examples.v:158](exact_protocol_examples.v#L158).
+
+```coq
+Theorem k_last_exact_certificate : certify_exact_dfa k_last_dfa = true.
+```
+
+<a id="declaration-k-last-complete-client-accepted"></a>
+
+### `k_last_complete_client_accepted`
+
+Source: [exact_protocol_examples.v:184](exact_protocol_examples.v#L184).
+
+```coq
+Example k_last_complete_client_accepted :
+  check_program k_last_family k_last_fields k_last_complete_client = true.
+```
+
+<a id="declaration-k-last-incomplete-client-rejected"></a>
+
+### `k_last_incomplete_client_rejected`
+
+Source: [exact_protocol_examples.v:187](exact_protocol_examples.v#L187).
+
+```coq
+Example k_last_incomplete_client_rejected :
+  check_program k_last_family k_last_fields k_last_incomplete_client = false.
+```
+
+<a id="declaration-k-last-complete-client-terminates"></a>
+
+### `k_last_complete_client_terminates`
+
+Source: [exact_protocol_examples.v:196](exact_protocol_examples.v#L196).
+
+```coq
+Example k_last_complete_client_terminates :
+  program_execution k_last_complete_client initial_machine k_last_complete_final.
+```
+
+<a id="declaration-k-last-client-completion-sound"></a>
+
+### `k_last_client_completion_sound`
+
+Source: [exact_protocol_examples.v:207](exact_protocol_examples.v#L207).
+
+```coq
+Theorem k_last_client_completion_sound m :
+  program_execution k_last_complete_client initial_machine m ->
+  forall l, (l < next_loc m)%coq_nat -> k_last (object_history m l).
+```
+
+<a id="declaration-ub-seed-accepts-ubu"></a>
+
+### `ub_seed_accepts_ubu`
+
+Source: [exact_protocol_examples.v:219](exact_protocol_examples.v#L219).
+
+```coq
+Example ub_seed_accepts_ubu : accepts ub_seed_family 0 [::false;true;false] = true.
+```
+
+<a id="declaration-k-last-not-pumping-closed"></a>
+
+### `k_last_not_pumping_closed`
+
+Source: [exact_protocol_examples.v:228](exact_protocol_examples.v#L228).
+
+```coq
+Example k_last_not_pumping_closed :
+  k_last [::false;true] /\
+  @pumping B false [::false;true] [::false;true;false] /\
+  ~ k_last [::false;true;false].
 ```
